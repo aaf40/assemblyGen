@@ -14,8 +14,8 @@
 !README.md
 
 # Track everything in the test directory
-!assgn3/
-!assgn3/**
+!src/
+!src/**
 !test/
 !test/**
 
