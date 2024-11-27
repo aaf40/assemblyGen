@@ -1,0 +1,31 @@
+# Ignore everything
+*
+*/
+
+# Unignore what we want to track
+!*.c
+!*.y
+!*.l
+!*.h
+!.mC
+!.exp
+!makefile
+!.gitignore
+!README.md
+
+# Track everything in the test directory
+!assgn3/
+!assgn3/**
+!test/
+!test/**
+
+# Ignore object files and executables
+*.exe
+*.o
+*.out
+obj/
+
+# Ignore generated files
+lex.yy.c
+y.tab.c
+y.tab.h
