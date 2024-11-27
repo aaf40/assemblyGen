@@ -1,0 +1,191 @@
+# Global variable allocations:
+.data
+
+.text
+	jal startmain
+	li $v0, 10
+	syscall
+	# Function definition
+startfunc:
+	# Setting up FP
+	sw $fp, ($sp)
+	move $fp, $sp
+	subi $sp, $sp, 4
+
+	# Saving registers
+	sw $s0, ($sp)
+	subi $sp, $sp, 4
+	sw $s1, ($sp)
+	subi $sp, $sp, 4
+	sw $s2, ($sp)
+	subi $sp, $sp, 4
+	sw $s3, ($sp)
+	subi $sp, $sp, 4
+	sw $s4, ($sp)
+	subi $sp, $sp, 4
+	sw $s5, ($sp)
+	subi $sp, $sp, 4
+	sw $s6, ($sp)
+	subi $sp, $sp, 4
+	sw $s7, ($sp)
+	subi $sp, $sp, 4
+
+	# Conditional statement
+	# Variable expression
+	lw $s0, 4($fp)
+	# Integer expression
+	li $s1, 3
+	# Relational comparison
+	# LT
+	sub $s2, $s0, $s1
+	slt $s3, $s2, $0
+	beq $s3, $0, L1
+	# True case
+
+	# Saving return address
+	sw $ra, ($sp)
+
+	# Evaluating and storing arguments
+
+	# Evaluating argument 0
+	# Variable expression
+	lw $s4, 4($fp)
+
+	# Storing argument 0
+	sw $s4, -4($sp)
+	subi $sp, $sp, 8
+
+	# Jump to callee
+
+	# jal will correctly set $ra as well
+	jal startoutput
+
+	# Deallocating space for arguments
+	addi $sp, $sp, 4
+
+	# Resetting return address
+	addi $sp, $sp, 4
+	lw $ra, ($sp)
+
+
+	# Move return value into another reg
+	move $s5, $2
+L1:
+endfunc:
+
+	# Reloading registers
+	addi $sp, $sp, 4
+	lw $s7, ($sp)
+	addi $sp, $sp, 4
+	lw $s6, ($sp)
+	addi $sp, $sp, 4
+	lw $s5, ($sp)
+	addi $sp, $sp, 4
+	lw $s4, ($sp)
+	addi $sp, $sp, 4
+	lw $s3, ($sp)
+	addi $sp, $sp, 4
+	lw $s2, ($sp)
+	addi $sp, $sp, 4
+	lw $s1, ($sp)
+	addi $sp, $sp, 4
+	lw $s0, ($sp)
+
+	# Setting FP back to old value
+	addi $sp, $sp, 4
+	lw $fp, ($sp)
+
+	# Return to caller
+	jr $ra
+
+	# Function definition
+startmain:
+	# Setting up FP
+	sw $fp, ($sp)
+	move $fp, $sp
+	subi $sp, $sp, 4
+
+	# Saving registers
+	sw $s0, ($sp)
+	subi $sp, $sp, 4
+	sw $s1, ($sp)
+	subi $sp, $sp, 4
+	sw $s2, ($sp)
+	subi $sp, $sp, 4
+	sw $s3, ($sp)
+	subi $sp, $sp, 4
+	sw $s4, ($sp)
+	subi $sp, $sp, 4
+	sw $s5, ($sp)
+	subi $sp, $sp, 4
+	sw $s6, ($sp)
+	subi $sp, $sp, 4
+	sw $s7, ($sp)
+	subi $sp, $sp, 4
+
+
+	# Saving return address
+	sw $ra, ($sp)
+
+	# Evaluating and storing arguments
+
+	# Evaluating argument 0
+	# Integer expression
+	li $s6, 1
+
+	# Storing argument 0
+	sw $s6, -4($sp)
+	subi $sp, $sp, 8
+
+	# Jump to callee
+
+	# jal will correctly set $ra as well
+	jal startfunc
+
+	# Deallocating space for arguments
+	addi $sp, $sp, 4
+
+	# Resetting return address
+	addi $sp, $sp, 4
+	lw $ra, ($sp)
+
+
+	# Move return value into another reg
+	move $s7, $2
+endmain:
+
+	# Reloading registers
+	addi $sp, $sp, 4
+	lw $s7, ($sp)
+	addi $sp, $sp, 4
+	lw $s6, ($sp)
+	addi $sp, $sp, 4
+	lw $s5, ($sp)
+	addi $sp, $sp, 4
+	lw $s4, ($sp)
+	addi $sp, $sp, 4
+	lw $s3, ($sp)
+	addi $sp, $sp, 4
+	lw $s2, ($sp)
+	addi $sp, $sp, 4
+	lw $s1, ($sp)
+	addi $sp, $sp, 4
+	lw $s0, ($sp)
+
+	# Setting FP back to old value
+	addi $sp, $sp, 4
+	lw $fp, ($sp)
+
+	# Return to caller
+	jr $ra
+
+# output function
+startoutput:
+	# Put argument in the output register
+	lw $a0, 4($sp)
+	# print int is syscall 1
+	li $v0, 1
+	syscall
+	# jump back to caller
+	jr $ra
+
