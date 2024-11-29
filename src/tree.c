@@ -76,38 +76,42 @@ void addChild(tree *parent, tree *child) {
       parent->numChildren++;
 }
 
-void printAst(tree *node, int nestLevel) {
-      char* nodeName = nodeNames[node->nodeKind];
-      if(strcmp(nodeName,"identifier") == 0){
-          if(node->val == -1)
-              printf("%s,%s\n", nodeName,"undeclared variable");
-          else
-              printf("%s,%s\n", nodeName,node->name);
-      }
-      else if(strcmp(nodeName,"integer") == 0){
-          printf("%s,%d\n", nodeName,node->val);
-      }
-      else if(strcmp(nodeName,"char") == 0){
-          printf("%s,%c\n", nodeName,node->val);
-      }
-      else if(strcmp(nodeName,"typeSpecifier") == 0){
-          printf("%s,%s\n", nodeName,typeNames[node->val]);
-      }
-      else if(strcmp(nodeName,"relop") == 0 || strcmp(nodeName,"mulop") == 0 || strcmp(nodeName,"addop") == 0){
-          printf("%s,%s\n", nodeName,ops[node->val]);
-      }
-      else{
-          printf("%s\n", nodeName);
-      }
+void printAst(tree* node, int nestLevel) {
+    if (!node) return;
+    
+    char* nodeName = nodeNames[node->nodeKind];
+    
+    // Print indentation
+    for (int j = 0; j < nestLevel; j++) {
+        printf("    ");
+    }
+    
+    // Handle different node types
+    if (node->nodeKind == INTEGER) {
+        printf("%s,%d\n", nodeName, node->val);
+    }
+    else if (node->nodeKind == IDENTIFIER || node->name) {
+        printf("%s,%s\n", nodeName, node->name);
+    }
+    else if (node->nodeKind == ADDOP || node->nodeKind == MULOP) {
+        char op_char = (char)node->val;
+        if (op_char) {
+            printf("%s,%c\n", nodeName, op_char);  // Print the operator character
+        } else {
+            printf("%s\n", nodeName);
+        }
+    }
+    else if (node->nodeKind == RELOP) {
+        printf("%s,%s\n", nodeName, ops[node->val]);
+    }
+    else {
+        printf("%s\n", nodeName);
+    }
 
-      int i, j;
-
-      for (i = 0; i < node->numChildren; i++)  {
-          for (j = 0; j < nestLevel; j++)
-              printf("    ");
-          printAst(getChild(node, i), nestLevel + 1);
-      }
-
+    // Print children
+    for (int i = 0; i < node->numChildren; i++) {
+        printAst(getChild(node, i), nestLevel + 1);
+    }
 }
 
 void analyzeProgram(tree *root) {
