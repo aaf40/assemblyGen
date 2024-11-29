@@ -184,23 +184,46 @@ typeSpecifier   : KWD_INT
                 ;
 
 // Function declaration
-funDecl         : typeSpecifier ID
+funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                 {
-                    //printf("DEBUG: funDecl - Processing function '%s' at line %d\n", $2, yylineno);
-                    ST_install_func($2, $1->type, NULL, 0, yylineno);
-                    new_scope();
-                }
-                LPAREN formalDeclList RPAREN funBody
-                {
-                    // Update function with parameters
-                    param* params = get_param_list();
-                    int num_params = count_params(params);
-                    symEntry* entry = ST_lookup($2);
-                    if (entry) {
-                        entry->params = params;
-                        entry->num_params = num_params;
+                    $$ = maketree(FUNDECL);
+                    addChild($$, $1);  // Add type specifier
+                    
+                    // Create and add identifier node
+                    tree* id = maketree(IDENTIFIER);
+                    setName(id, $2);
+                    addChild($$, id);
+                    
+                    // Add parameter list and function body
+                    if ($4) addChild($$, $4);  // formalDeclList
+                    if ($6) addChild($$, $6);  // funBody
+                    
+                    // Symbol table handling
+                    symEntry* entry = ST_insert($2, $1->type, ST_FUNC);
+                    if (!entry) {
+                        add_semantic_error(yylineno, "Function redefinition.");
                     }
-                    up_scope();
+                }
+                | typeSpecifier ID LPAREN RPAREN funBody
+                {
+                    $$ = maketree(FUNDECL);
+                    addChild($$, $1);  // Add type specifier
+                    
+                    // Create and add identifier node
+                    tree* id = maketree(IDENTIFIER);
+                    setName(id, $2);
+                    addChild($$, id);
+                    
+                    // Add empty parameter list and function body
+                    tree* emptyParams = maketree(FORMALDECLLIST);
+                    addChild($$, emptyParams);
+                    if ($5) addChild($$, $5);  // funBody
+                    
+                    // Symbol table handling
+                    symEntry* entry = ST_insert($2, $1->type, ST_FUNC);
+                    if (!entry) {
+                        add_semantic_error(yylineno, "Function redefinition.");
+                    }
                 }
                 ;
 
@@ -254,18 +277,11 @@ formalDecl      : typeSpecifier ID
 
 // Function body
 // Contains local declarations and statements
-funBody         : LCRLY_BRKT 
+funBody         : LCRLY_BRKT localDeclList statementList RCRLY_BRKT
                 {
-                    //printf("DEBUG: funBody - Creating new scope\n");
-                    new_scope();  // Create new scope when entering function body
-                }
-                localDeclList statementList RCRLY_BRKT
-                {
-                    //printf("DEBUG: funBody - Completing function body\n");
                     $$ = maketree(FUNBODY);
-                    if ($3 != NULL && $3->numChildren > 0) addChild($$, $3);
-                    if ($4 != NULL) addChild($$, $4);
-                    up_scope();   // Return to parent scope when exiting function body
+                    if ($2) addChild($$, $2);  // Always add localDeclList
+                    if ($3) addChild($$, $3);  // Always add statementList
                 }
                 ;
 
@@ -288,17 +304,15 @@ localDeclList   : /* empty */
 
 // List of statements
 // Handles multiple statements in a block
-statementList   : /* empty */
-                {
-                    $$ = NULL;  // Empty statement list
-                }
-                | statement statementList
+statementList   : statement
                 {
                     $$ = maketree(STATEMENTLIST);
-                    addChild($$, $1);  // Add the new statement
-                    if ($2 != NULL) {
-                        addChild($$, $2);  // Add the rest of the statementList if it exists
-                    }
+                    addChild($$, $1);
+                }
+                | statementList statement
+                {
+                    $$ = $1;  // Use existing STATEMENTLIST node
+                    addChild($$, $2);  // Add new statement
                 }
                 ;
 

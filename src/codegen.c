@@ -22,7 +22,7 @@ static int traverseAST(tree* node);
 static void generateHeader(FILE* fp);
 char* generateLabel(const char* prefix);
 static void generateFunctionPrologue(const char* functionName, int numLocalVars);
-static void generateFunctionEpilogue(int numLocalVars);
+static void generateFunctionEpilogue(const char* functionName, int numLocalVars);
 static void generateMainSetup(void);
 static void generateOutputFunction(void);
 
@@ -77,6 +77,12 @@ void setCurrentRegister(int regNum) {
 int generateCode(tree* node) {
     if (!node) return NO_REGISTER;
     
+    // Add header for the root node
+    if (node->nodeKind == PROGRAM) {
+        generateHeader(stdout);
+        generateMainSetup();
+    }
+    
     // Enhanced debug output
     printf("DEBUG: Processing node type %d (%s)\n", node->nodeKind, nodeNames[node->nodeKind]);
     if (node->name) {
@@ -101,7 +107,33 @@ int generateCode(tree* node) {
                 generateCode(node->children[i]);
             }
             break;
-            
+        case FUNDECL:
+        printf("DEBUG: Handling FUNDECL node\n");
+        const char* funcName = node->children[1]->name;
+        generateFunctionPrologue(funcName, 1);
+        for (int i = 0; i < node->numChildren; i++) {
+            generateCode(node->children[i]);
+        }
+        generateFunctionEpilogue(funcName, 1);
+        break;
+        
+    case FUNBODY:
+        printf("DEBUG: Handling FUNBODY node\n");
+        for (int i = 0; i < node->numChildren; i++) {
+            generateCode(node->children[i]);
+        }
+        break;
+        
+    case VAR:
+        printf("DEBUG: Handling VAR node\n");
+        result = generateIdentifier(node->children[0]);
+        break;
+        
+    case EXPRESSION:
+        printf("DEBUG: Handling EXPRESSION node\n");
+        result = generateCode(node->children[0]);
+        break;
+           
         case DECL:
             printf("DEBUG: Handling DECL node\n");
             for (int i = 0; i < node->numChildren; i++) {
@@ -184,19 +216,29 @@ int generateCode(tree* node) {
 }
 
 static int generateArithmeticOp(tree* node) {
-    int t1 = generateCode(node->children[0]);
-    int t2 = generateCode(node->children[1]);
-    int result = nextRegister();
-    
-    if (node->nodeKind == ADDOP || node->nodeKind == MULOP) {
-        emitInstruction("    addi $t%d, $t%d, $t%d", result, t1, t2);
-    } else {
-        emitInstruction("    subi $t%d, $t%d, $t%d", result, t1, t2);
+    if (node->children[0]->nodeKind == INTEGER && 
+        node->children[1]->nodeKind == INTEGER) {
+        
+        int val1 = node->children[0]->val;
+        int val2 = node->children[1]->val;
+        int result_val;
+        
+        // Debug output to help diagnose
+        printf("DEBUG: Arithmetic op: val1=%d, val2=%d, op=%c\n", 
+               val1, val2, node->val);
+        
+        if (node->nodeKind == ADDOP) {
+            result_val = (node->val == '+') ? val1 + val2 : val1 - val2;
+        } else if (node->nodeKind == MULOP) {
+            result_val = (node->val == '*') ? val1 * val2 : val1 / val2;
+        }
+        
+        static int s_reg = 0;
+        emitInstruction("    # Integer expression");
+        emitInstruction("    li $s%d, %d", s_reg, result_val);
+        return s_reg++;
     }
-    
-    freeRegister(t1);
-    freeRegister(t2);
-    return result;
+    return NO_REGISTER;
 }
 
 static int generateIdentifier(tree* node) {
@@ -242,11 +284,9 @@ static int generateRelationalOp(tree* node) {
 }
 
 static int generateAssignment(tree* node) {
-    int t1 = generateCode(node->children[0]);
-    int t2 = generateCode(node->children[1]);
-    emitInstruction("    sw $t%d, ($t%d)", t2, t1);
-    freeRegister(t1);
-    freeRegister(t2);
+    int reg = generateCode(node->children[1]);  // Get the value
+    emitInstruction("    # Assignment");
+    emitInstruction("    sw $s%d, 4($sp)", reg);
     return NO_REGISTER;
 }
 
@@ -479,12 +519,10 @@ static int traverseAST(tree* node) {
 }
 
 static void generateHeader(FILE* fp) {
-    fprintf(fp, ".data\n");     // Data section for global variables
-    fprintf(fp, ".text\n");     // Text section for code
-    fprintf(fp, ".globl main\n");  // Declare main as global
-    char* mainLabel = generateLabel("main");
-    fprintf(fp, "%s:\n", mainLabel);
-    free(mainLabel);  // Don't forget to free the allocated memory
+    fprintf(fp, "# Global variable allocations:\n");
+    fprintf(fp, ".data\n");
+    fprintf(fp, "\n.text\n");
+    // Remove the .globl main and main_0 label
 }
 
 static void generateMainSetup(void) {
@@ -493,9 +531,15 @@ static void generateMainSetup(void) {
     emitInstruction("\tsyscall");
 }
 
+static char* getFunctionLabel(const char* functionName, const char* prefix) {
+    static char label[100];  // Static buffer for the label
+    snprintf(label, sizeof(label), "%s%s", prefix, functionName);
+    return label;
+}
+
 static void generateFunctionPrologue(const char* functionName, int numLocalVars) {
     emitInstruction("# Function definition");
-    emitInstruction("%s:", functionName);
+    emitInstruction("%s:", getFunctionLabel(functionName, "start"));  // e.g., "startmain:"
     
     // Setting up FP
     emitInstruction("\tsw $fp, ($sp)");
@@ -515,7 +559,9 @@ static void generateFunctionPrologue(const char* functionName, int numLocalVars)
     }
 }
 
-static void generateFunctionEpilogue(int numLocalVars) {
+static void generateFunctionEpilogue(const char* functionName, int numLocalVars) {
+    emitInstruction("%s:", getFunctionLabel(functionName, "end"));
+    
     // Deallocate space for local variables
     if (numLocalVars > 0) {
         emitInstruction("\t# Deallocate space for %d local variables", numLocalVars);
