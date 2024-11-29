@@ -557,20 +557,24 @@ relop           : OPER_LTE
 addop           : OPER_ADD
                 {
                     $$ = maketree(ADDOP);
+                    $$->val = '+';  // Explicitly set addition operator
                 }
                 | OPER_SUB
                 {
                     $$ = maketree(ADDOP);
+                    $$->val = '-';  // Explicitly set subtraction operator
                 }
                 ;
 
 mulop           : OPER_MUL
                 {
                     $$ = maketree(MULOP);
+                    $$->val = '*';  // Set multiplication operator
                 }
                 | OPER_DIV
                 {
                     $$ = maketree(MULOP);
+                    $$->val = '/';  // Set division operator
                 }
                 ;
 
