@@ -1,8 +1,9 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include<../src/tree.h>
-#include<../src/strtab.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "../src/tree.h"
+#include "../src/strtab.h"
+#include "../src/codegen.h"
 
 extern int yyparse(void);
 extern FILE* yyin;
@@ -49,6 +50,8 @@ int main(int argc, char *argv[]) {
             printAst(ast, 1);
         if(p_symtab)
             print_sym_tab();
+        
+        generateCode(ast);
     }
     return 0;
 }

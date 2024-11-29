@@ -358,6 +358,18 @@ void init_symbol_table(void) {
         memset(root, 0, sizeof(table_node));
         current_scope = root;
     }
+    
+    // Pre-declare the output library function
+    symEntry* output_func = ST_insert("output", DT_VOID, ST_FUNC);
+    
+    // Set up its parameter info
+    param* p = malloc(sizeof(param));
+    p->name = "x";
+    p->data_type = DT_INT;
+    p->symbol_type = ST_SCALAR;
+    p->next = NULL;
+    
+    ST_set_function_info(output_func, DT_VOID, p, 1);
 }
 
 // Adds a semantic error to the error array with the given line number and message.
