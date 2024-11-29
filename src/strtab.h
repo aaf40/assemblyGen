@@ -43,6 +43,7 @@ typedef struct symEntry {
     dataType data_type;
     enum symbolType sym_type;
     int scope;                 // GLOBAL_SCOPE or LOCAL_SCOPE
+    int offset;               // Stack offset for local variables
     
     // For arrays
     int array_size;           // Size if array type

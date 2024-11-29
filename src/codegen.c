@@ -294,30 +294,23 @@ static int generateArithmeticOp(tree* node) {
 }
 
 static int generateIdentifier(tree* node) {
-    //printf("DEBUG: Generating identifier for: %s\n", node->name);
     if (!node || !node->name) return ERROR_REGISTER;
     
     symEntry* entry = ST_lookup(node->name);
-    //printf("DEBUG: Symbol table entry found: %s\n", entry ? "yes" : "no");
+    if (!entry) return ERROR_REGISTER;
     
-    // Only generate load instruction if this is a variable reference
-    if (entry && node->parent && 
-        (node->parent->nodeKind == VAR || 
-         node->parent->nodeKind == ASSIGNSTMT)) {
-        int result = nextRegister();
-        //printf("DEBUG: Allocated register: %d\n", result);
-        
-        emitInstruction("\t# Variable expression");
-        // Add 'var' prefix for global variables
-        if (entry->scope == GLOBAL_SCOPE) {
-            emitInstruction("\tlw $s%d, var%s\n", result, node->name);
-        } else {
-            emitInstruction("\tlw $s%d, %s\n", result, entry->id);
-        }
-        return result;
+    int result = nextRegister();
+    emitInstruction("\t# Variable expression");
+    
+    if (entry->scope == LOCAL_SCOPE) {
+        // For local variables, always use 4($sp)
+        emitInstruction("\tlw $s%d, 4($sp)", result);
+    } else {
+        // For global variables
+        emitInstruction("\tlw $s%d, var%s", result, node->name);
     }
     
-    return NO_REGISTER;
+    return result;
 }
 
 static int generateInteger(tree* node) {
@@ -359,12 +352,20 @@ static int generateRelationalOp(tree* node) {
 static int generateAssignment(tree* node) {
     if (!node || node->numChildren < 2) return ERROR_REGISTER;
     
-    // Generate code for the right-hand side (this will be our pre-calculated value)
+    tree* var_node = node->children[0];
+    if (!var_node || var_node->numChildren < 1) return ERROR_REGISTER;
+    
+    symEntry* entry = ST_lookup(var_node->children[0]->name);
+    if (!entry) return ERROR_REGISTER;
+    
     int valueReg = generateCode(node->children[1]);
     
-    // Emit the assignment
     emitInstruction("\t# Assignment");
-    emitInstruction("\tsw $s%d, 4($sp)", valueReg);
+    if (entry->scope == LOCAL_SCOPE) {
+        emitInstruction("\tsw $s%d, 4($sp)", valueReg);
+    } else {
+        emitInstruction("\tsw $s%d, var%s", valueReg, var_node->children[0]->name);
+    }
     
     return valueReg;
 }
