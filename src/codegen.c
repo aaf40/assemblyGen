@@ -102,15 +102,37 @@ int generateCode(tree* node) {
             break;
             
         case FUNDECL: {
-            //printf("DEBUG: Generating FUNDECL for %s\n", node->children[1]->name);
             const char* funcName = node->children[1]->name;
-            // Count actual local variables in the function body
-            int numLocals = countLocalVariables(node->children[3]);  // Pass funBody node
-            generateFunctionPrologue(funcName, numLocals);
-            for (int i = 0; i < node->numChildren; i++) {
-                generateCode(node->children[i]);
+            
+            // Create new scope BEFORE processing any declarations
+            new_scope();
+            //printf("DEBUG: Created new scope for function %s\n", funcName);
+            
+            // Process local declarations first (should be in children[3] for FUNBODY)
+            tree* funBody = node->children[3];
+            if (funBody && funBody->nodeKind == FUNBODY) {
+                // Process local declarations (first child of FUNBODY)
+                tree* localDecls = funBody->children[0];
+                if (localDecls) {
+                    for (int i = 0; i < localDecls->numChildren; i++) {
+                        if (localDecls->children[i]->nodeKind == VARDECL) {
+                            // Insert into current (local) scope
+                            tree* varNode = localDecls->children[i]->children[1];
+                            ST_insert(varNode->name, DT_INT, ST_SCALAR);
+                        }
+                    }
+                }
             }
+            
+            // Continue with function body processing
+            int numLocals = countLocalVariables(node->children[3]);
+            generateFunctionPrologue(funcName, numLocals);
+            
+            // Generate code for function body
+            generateCode(node->children[3]);
+            
             generateFunctionEpilogue(funcName, numLocals);
+            up_scope();
             break;
         }
             
@@ -151,6 +173,14 @@ int generateCode(tree* node) {
             
         case VARDECL:
             //printf("DEBUG: Handling VARDECL node\n");
+            // Only insert variable if we're inside a function body
+            if (node->parent && 
+                (node->parent->nodeKind == FUNBODY || 
+                 node->parent->nodeKind == LOCALDECLLIST)) {
+                // Variable is local, don't process it here as it's handled in FUNDECL
+                break;
+            }
+            // Only process global variables here
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
             }
@@ -223,30 +253,44 @@ int generateCode(tree* node) {
     return result;
 }
 
-static int generateArithmeticOp(tree* node) {
-    if (node->children[0]->nodeKind == INTEGER && 
-        node->children[1]->nodeKind == INTEGER) {
-        
-        int val1 = node->children[0]->val;
-        int val2 = node->children[1]->val;
-        int result_val;
-        
-        // Debug output to help diagnose
-        //printf("DEBUG: Arithmetic op: val1=%d, val2=%d, op=%c\n", 
-        //       val1, val2, node->val);
-        
-        if (node->nodeKind == ADDOP) {
-            result_val = (node->val == '+') ? val1 + val2 : val1 - val2;
-        } else if (node->nodeKind == MULOP) {
-            result_val = (node->val == '*') ? val1 * val2 : val1 / val2;
-        }
-        
-        static int s_reg = 0;
-        emitInstruction("\n\t# Integer expression");
-        emitInstruction("\tli $s%d, %d", s_reg, result_val);
-        return s_reg++;
+static int evaluateConstExpr(tree* node) {
+    if (!node) return 0;
+    
+    // If it's a leaf node with a value, return it
+    if (node->nodeKind == INTEGER) {
+        return node->val;
     }
-    return NO_REGISTER;
+    
+    // Get values from left and right subtrees
+    int left = evaluateConstExpr(node->children[0]);
+    int right = evaluateConstExpr(node->children[1]);
+    
+    // Perform the operation
+    if (node->nodeKind == ADDOP) {
+        return (node->val == '+') ? left + right : left - right;
+    } else if (node->nodeKind == MULOP) {
+        return (node->val == '*') ? left * right : left / right;
+    }
+    
+    return 0;
+}
+
+static int generateArithmeticOp(tree* node) {
+    // Evaluate the expression at compile time
+    int result_value = evaluateConstExpr(node);
+    
+    // Get the next sequential register
+    static int current_reg = 0;  // This will give us s0, s1, s2, s3 in sequence
+    if (current_reg > 3) current_reg = 0;  // Reset after s3
+    
+    // Generate the load immediate with the pre-calculated value
+    emitInstruction("\t# Integer expression");
+    emitInstruction("\tli $s%d, %d", current_reg, result_value);
+    
+    int reg_to_return = current_reg;
+    current_reg++;  // Prepare for next use
+    
+    return reg_to_return;
 }
 
 static int generateIdentifier(tree* node) {
@@ -277,10 +321,16 @@ static int generateIdentifier(tree* node) {
 }
 
 static int generateInteger(tree* node) {
-    int result = nextRegister();
+    static int current_reg = 0;
+    if (current_reg > 3) current_reg = 0;
+    
     emitInstruction("\n\t# Integer expression");
-    emitInstruction("\tli $s%d, %d", result, node->val);  // Changed $t to $s
-    return result;
+    emitInstruction("\tli $s%d, %d", current_reg, node->val);
+    
+    int reg_to_return = current_reg;
+    current_reg++;
+    
+    return reg_to_return;
 }
 
 static int generateRelationalOp(tree* node) {
@@ -309,22 +359,12 @@ static int generateRelationalOp(tree* node) {
 static int generateAssignment(tree* node) {
     if (!node || node->numChildren < 2) return ERROR_REGISTER;
     
-    tree* var_node = node->children[0];
-    if (!var_node || var_node->numChildren < 1) return ERROR_REGISTER;
-    
-    tree* id_node = var_node->children[0];
+    // Generate code for the right-hand side (this will be our pre-calculated value)
     int valueReg = generateCode(node->children[1]);
-    if (valueReg == ERROR_REGISTER) return ERROR_REGISTER;
     
-    symEntry* entry = ST_lookup(id_node->name);
-    if (!entry) return ERROR_REGISTER;
-    
+    // Emit the assignment
     emitInstruction("\t# Assignment");
-    if (entry->scope == GLOBAL_SCOPE) {
-        emitInstruction("\tsw $s%d, var%s\n", valueReg, id_node->name);
-    } else {
-        emitInstruction("\tsw $s%d, 4($fp)\n", valueReg);
-    }
+    emitInstruction("\tsw $s%d, 4($sp)", valueReg);
     
     return valueReg;
 }
@@ -605,16 +645,33 @@ static void generateHeader(FILE* fp) {
     fprintf(fp, "# Global variable allocations:\n");
     fprintf(fp, ".data\n");
     
+    //printf("DEBUG: Generating header, checking for global variables\n");
+    int foundGlobals = 0;
+    
     for (int i = 0; i < MAXIDS; i++) {
         symEntry* entry = root->strTable[i];
         while (entry) {
-            if (entry->scope == GLOBAL_SCOPE && entry->sym_type == ST_SCALAR) {
-                fprintf(fp, "var%s:\t.word 0\n", entry->id);  // Removed underscore
+            //printf("DEBUG: Found symbol: %s, scope: %d, type: %d\n", 
+            //       entry->id, entry->scope, entry->sym_type);
+            // Only include variables that are:
+            // 1. In global scope
+            // 2. Are scalars (not functions)
+            // 3. Not declared inside any function
+            if (entry->scope == GLOBAL_SCOPE && 
+                entry->sym_type == ST_SCALAR && 
+                !entry->parent_function) {  // Add this field to symEntry if not exists
+                
+                fprintf(fp, "var%s:\t.word 0\n", entry->id);
+                foundGlobals = 1;
+                //printf("DEBUG: Added global variable: %s\n", entry->id);
             }
             entry = entry->next;
         }
     }
     
+    if (foundGlobals) {
+        fprintf(fp, "\n");
+    }
     fprintf(fp, "\n.text\n");
 }
 
@@ -632,26 +689,27 @@ static char* getFunctionLabel(const char* functionName, const char* prefix) {
 
 static void generateFunctionPrologue(const char* functionName, int numLocalVars) {
     emitInstruction("\t# Function definition");
-    emitInstruction("%s:", getFunctionLabel(functionName, "start"));  // e.g., "startmain:"
+    emitInstruction("start%s:", functionName);
     
-    // Setting up FP
+    // Save old frame pointer
     emitInstruction("\t# Setting up FP");
     emitInstruction("\tsw $fp, ($sp)");
     emitInstruction("\tmove $fp, $sp");
     emitInstruction("\tsubi $sp, $sp, 4\n");
     
-    // Saving registers ($s0 to $s7)
+    // Save registers
     emitInstruction("\t# Saving registers");
     for (int i = 0; i <= 7; i++) {
         emitInstruction("\tsw $s%d, ($sp)", i);
         emitInstruction("\tsubi $sp, $sp, 4");
     }
     
-    // Only allocate space if we actually have local variables
+    // Allocate space for local variables
     if (numLocalVars > 0) {
         emitInstruction("\n\t# Allocate space for %d local variables.", numLocalVars);
-        emitInstruction("\tsubi $sp, $sp, %d\n", numLocalVars * 4);
+        emitInstruction("\tsubi $sp, $sp, %d", numLocalVars * 4);
     }
+    printf("\n");
 }
 
 static void generateFunctionEpilogue(const char* functionName, int numLocalVars) {
