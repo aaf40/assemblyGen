@@ -34,12 +34,13 @@ tree *getCurrentFunction() {
 }
 
 tree *maketree(int kind) {
-      tree *this = (tree *) malloc(sizeof(struct treenode));
-      this->nodeKind = kind;
-      this->numChildren = 0;
-      this->name = NULL;
-      this->type = DT_VOID;
-      return this;
+    tree *this = (tree *) malloc(sizeof(struct treenode));
+    this->nodeKind = kind;
+    this->numChildren = 0;
+    this->name = NULL;
+    this->type = DT_VOID;
+    this->parent = NULL;
+    return this;
 }
 
 tree* maketreeWithVal(int kind, int val) {
@@ -68,12 +69,13 @@ tree* maketreeWithVal(int kind, int val) {
 }
 
 void addChild(tree *parent, tree *child) {
-      if (parent->numChildren == MAXCHILDREN) {
-          printf("Cannot add child to parent node\n");
-          exit(1);
-      }
-      nextAvailChild(parent) = child;
-      parent->numChildren++;
+    if (!parent || !child) return;
+    if (parent->numChildren >= MAXCHILDREN) {
+        fprintf(stderr, "Error: Too many children\n");
+        return;
+    }
+    parent->children[parent->numChildren++] = child;
+    child->parent = parent;
 }
 
 void printAst(tree* node, int nestLevel) {

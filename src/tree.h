@@ -52,6 +52,7 @@ struct treenode {
     int val;
     char *name;
     dataType type;
+    struct treenode *parent;
 };
 
 // Function declarations
