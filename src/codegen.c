@@ -85,9 +85,9 @@ int generateCode(tree* node) {
     
     // Enhanced debug output
     //printf("DEBUG: Processing node type %d (%s)\n", node->nodeKind, nodeNames[node->nodeKind]);
-    if (node->name) {
+    //if (node->name) {
         //printf("DEBUG: Node name: %s\n", node->name);
-    }
+    //}
     //printf("DEBUG: Number of children: %d\n", node->numChildren);
     
     int result = NO_REGISTER;
