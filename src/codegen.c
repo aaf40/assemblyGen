@@ -7,7 +7,11 @@
 #include <string.h>  // for strcmp
 
 // Global variables for register management
-static int registers[NUM_REGISTERS];  // 0: free, 1: in use
+#define FIRST_SAVED_REG 0    // $s0
+#define LAST_SAVED_REG 7     // $s7
+#define NUM_SAVED_REGS (LAST_SAVED_REG - FIRST_SAVED_REG + 1)
+
+static int registers[NUM_SAVED_REGS];  // Track $s0-$s7 only
 static int currentRegister = NO_REGISTER;
 // Forward declarations
 static int generateArithmeticOp(tree* node);
@@ -32,33 +36,31 @@ static int labelCounter = 0;
 extern char *nodeNames[];  // Defined in tree.c
 
 void initRegisters(void) {
-    for (int i = 0; i < NUM_REGISTERS; i++) {
+    for (int i = 0; i < NUM_SAVED_REGS; i++) {
         registers[i] = 0;  // Mark all registers as free
     }
     currentRegister = NO_REGISTER;
 }
 
 int nextRegister(void) {
-    for (int i = 0; i < NUM_REGISTERS; i++) {
+    // Only allocate saved registers ($s0-$s7)
+    for (int i = FIRST_SAVED_REG; i <= LAST_SAVED_REG; i++) {
         if (registers[i] == 0) {
-            registers[i] = 1;  // Mark as in use
+            registers[i] = 1;
             currentRegister = i;
             return i;
         }
     }
-    // Handle register spilling if necessary
-    fprintf(stderr, "Error: Out of registers\n");
+    fprintf(stderr, "Error: No available saved registers\n");
     exit(1);
 }
 
 void freeRegister(int regNum) {
-    if (regNum >= 0 && regNum < NUM_REGISTERS) {
-        registers[regNum] = 0;  // Mark as free
+    if (regNum >= FIRST_SAVED_REG && regNum <= LAST_SAVED_REG) {
+        registers[regNum] = 0;
         if (currentRegister == regNum) {
             currentRegister = NO_REGISTER;
         }
-    } else {
-        fprintf(stderr, "Error: Invalid register number %d\n", regNum);
     }
 }
 
@@ -67,7 +69,7 @@ int getCurrentRegister(void) {
 }
 
 void setCurrentRegister(int regNum) {
-    if (regNum >= -1 && regNum < NUM_REGISTERS) {  // -1 is valid for NO_REGISTER
+    if (regNum >= -1 && regNum < NUM_SAVED_REGS) {  // -1 is valid for NO_REGISTER
         currentRegister = regNum;
     } else {
         fprintf(stderr, "Error: Invalid register number %d\n", regNum);
@@ -78,10 +80,10 @@ int generateCode(tree* node) {
     if (!node) return NO_REGISTER;
     
     // Add header for the root node
-    if (node->nodeKind == PROGRAM) {
-        generateHeader(stdout);
-        generateMainSetup();
-    }
+    //if (node->nodeKind == PROGRAM) {
+        //generateHeader(stdout);
+        //generateMainSetup();
+    //}
     
     // Enhanced debug output
     //printf("DEBUG: Processing node type %d (%s)\n", node->nodeKind, nodeNames[node->nodeKind]);
@@ -95,11 +97,13 @@ int generateCode(tree* node) {
     // Process this node
     switch(node->nodeKind) {
         case PROGRAM:
-            //printf("DEBUG: Handling PROGRAM node\n");
+            generateHeader(stdout);
+            generateMainSetup();
+            // Don't generate any more code here
+            // Just traverse children
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
             }
-            // Generate the output function
             generateOutputFunction();
             break;
             
@@ -244,15 +248,24 @@ static int generateArithmeticOp(tree* node) {
 }
 
 static int generateIdentifier(tree* node) {
-    int result;
-    if ((result = hasSeen(node->name))) {
-        return result;
+    if (!node || !node->name) return ERROR_REGISTER;
+    
+    symEntry* entry = ST_lookup(node->name);
+    if (!entry) return ERROR_REGISTER;
+    
+    int result = nextRegister();
+    if (result == ERROR_REGISTER) return ERROR_REGISTER;
+    
+    if (entry->scope == GLOBAL_SCOPE) {
+        //emitInstruction("\t# Load global variable %s", node->name);
+        //emitInstruction("\tlw $s%d, var_%s", result, node->name);
+    } else {
+        //emitInstruction("\t# Load local variable %s", node->name);
+        // Calculate offset based on variable's position in stack frame
+        int offset = 4;  // Basic offset, you might need to calculate this properly
+        emitInstruction("\tlw $s%d, %d($fp)", result, offset);
     }
     
-    int t1 = base(node);
-    int t2 = offset(node);
-    result = nextRegister();
-    emitInstruction("\tlw $t%d, %d($t%d)", result, t2, t1);
     return result;
 }
 
@@ -287,10 +300,35 @@ static int generateRelationalOp(tree* node) {
 }
 
 static int generateAssignment(tree* node) {
-    int reg = generateCode(node->children[1]);  // Get the value
-    emitInstruction("\t# Assignment");
-    emitInstruction("\tsw $s%d, 4($sp)", reg);
-    return NO_REGISTER;
+    if (!node || node->numChildren < 2) return ERROR_REGISTER;
+    
+    // Get the variable node and name
+    tree* var_node = node->children[0];
+    if (!var_node || var_node->numChildren < 1) return ERROR_REGISTER;
+    
+    tree* id_node = var_node->children[0];
+    if (!id_node || !id_node->name) return ERROR_REGISTER;
+    
+    // Look up the variable in symbol table
+    symEntry* entry = ST_lookup(id_node->name);
+    if (!entry) return ERROR_REGISTER;
+    
+    // Generate code for the right-hand side expression
+    int valueReg = generateCode(node->children[1]);
+    if (valueReg == ERROR_REGISTER) return ERROR_REGISTER;
+    
+    // Generate store instruction based on scope
+    if (entry->scope == GLOBAL_SCOPE) {
+        emitInstruction("\t# Store to global variable %s", id_node->name);
+        emitInstruction("\tsw $s%d, var_%s", valueReg, id_node->name);
+    } else {
+        emitInstruction("\t# Store to local variable %s", id_node->name);
+        // Calculate offset based on variable's position in stack frame
+        int offset = 4;  // Basic offset, you might need to calculate this properly
+        emitInstruction("\tsw $s%d, %d($fp)", valueReg, offset);
+    }
+    
+    return valueReg;
 }
 
 static int generateWhileLoop(tree* node) {
@@ -357,26 +395,46 @@ int output(tree* node) {
 }
 
 static int generateFunctionCall(tree* node) {
-    // Save return address
+    // Save return address first
     emitInstruction("\t# Saving return address");
     emitInstruction("\tsw $ra, ($sp)");
-    emitInstruction("\tsubi $sp, $sp, 4");
     
-    emitInstruction("\t# Jump to callee");
-    emitInstruction("\t# jal will correctly set $ra as well");
-    emitInstruction("\tjal start%s", node->children[0]->name);  // Use start prefix
+    emitInstruction("\n\t# Evaluating and storing arguments\n");
     
-    // Restore return address
+    // Process each argument
+    for (int i = 1; i < node->numChildren; i++) {
+        emitInstruction("\t# Evaluating argument %d", i-1);
+        int argReg = generateCode(node->children[i]);
+        
+        // Store argument and adjust stack
+        emitInstruction("\t# Storing argument %d", i-1);
+        emitInstruction("\tsw $s%d, -4($sp)", argReg);
+        emitInstruction("\tsubi $sp, $sp, 8");
+        
+        // Free register after use
+        freeRegister(argReg);
+    }
+    
+    // Make the call
+    emitInstruction("\t# Jump to callee\n");
+    emitInstruction("\tjal start%s", node->children[0]->name);
+    
+    // Clean up stack and restore return address
+    if (node->numChildren > 1) {
+        emitInstruction("\t# Deallocating space for arguments");
+        emitInstruction("\taddi $sp, $sp, 4");
+    }
+    
     emitInstruction("\t# Resetting return address");
     emitInstruction("\taddi $sp, $sp, 4");
     emitInstruction("\tlw $ra, ($sp)");
     
-    // Get return value
+    // Handle return value
+    int retReg = nextRegister();
     emitInstruction("\t# Move return value into another reg");
-    int result = nextRegister();
-    emitInstruction("\tmove $s%d, $2", result);
+    emitInstruction("\tmove $s%d, $2", retReg);
     
-    return result;
+    return retReg;
 }
 
 char* generateLabel(const char* prefix) {
@@ -529,8 +587,19 @@ static int traverseAST(tree* node) {
 static void generateHeader(FILE* fp) {
     fprintf(fp, "# Global variable allocations:\n");
     fprintf(fp, ".data\n");
+    
+    // Traverse root's symbol table for global variables
+    for (int i = 0; i < MAXIDS; i++) {
+        symEntry* entry = root->strTable[i];
+        while (entry) {
+            if (entry->scope == GLOBAL_SCOPE && entry->sym_type == ST_SCALAR) {
+                fprintf(fp, "var_%s:\t.word 0\n", entry->id);  // Changed prefix to var_
+            }
+            entry = entry->next;
+        }
+    }
+    
     fprintf(fp, "\n.text\n");
-    // Remove the .globl main and main_0 label
 }
 
 static void generateMainSetup(void) {
