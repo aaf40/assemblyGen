@@ -357,19 +357,24 @@ int output(tree* node) {
 }
 
 static int generateFunctionCall(tree* node) {
-    // Save registers that will be used
-    for (int i = 0; i < node->numChildren; i++) {
-        int argReg = generateCode(node->children[i]);
-        emitInstruction("\tmove $a%d, $t%d", i, argReg);
-        freeRegister(argReg);
-    }
+    // Save return address
+    emitInstruction("\t# Saving return address");
+    emitInstruction("\tsw $ra, ($sp)");
+    emitInstruction("\tsubi $sp, $sp, 4");
     
-    // Make the call
-    emitInstruction("\tjal %s", node->name);
+    emitInstruction("\t# Jump to callee");
+    emitInstruction("\t# jal will correctly set $ra as well");
+    emitInstruction("\tjal start%s", node->children[0]->name);  // Use start prefix
+    
+    // Restore return address
+    emitInstruction("\t# Resetting return address");
+    emitInstruction("\taddi $sp, $sp, 4");
+    emitInstruction("\tlw $ra, ($sp)");
     
     // Get return value
+    emitInstruction("\t# Move return value into another reg");
     int result = nextRegister();
-    emitInstruction("\tmove $t%d, $v0", result);
+    emitInstruction("\tmove $s%d, $2", result);
     
     return result;
 }
@@ -541,7 +546,7 @@ static char* getFunctionLabel(const char* functionName, const char* prefix) {
 }
 
 static void generateFunctionPrologue(const char* functionName, int numLocalVars) {
-    emitInstruction("\n\t# Function definition");
+    emitInstruction("\t# Function definition");
     emitInstruction("%s:", getFunctionLabel(functionName, "start"));  // e.g., "startmain:"
     
     // Setting up FP
@@ -587,11 +592,11 @@ static void generateFunctionEpilogue(const char* functionName, int numLocalVars)
     
     // Return to caller
     emitInstruction("\n\t# Return to caller");
-    emitInstruction("\tjr $ra");
+    emitInstruction("\tjr $ra\n");
 }
 
 static void generateOutputFunction(void) {
-    emitInstruction("\n# output function");
+    emitInstruction("# output function");
     emitInstruction("startoutput:");
     emitInstruction("\t# Put argument in the output register");
     emitInstruction("\tlw $a0, 4($sp)");
