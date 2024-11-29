@@ -11,6 +11,10 @@
 #define LAST_SAVED_REG 7     // $s7
 #define NUM_SAVED_REGS (LAST_SAVED_REG - FIRST_SAVED_REG + 1)
 
+#define VALUE_REG 0    // For immediate values and arithmetic results
+#define VAR_ACCESS_REG 1    // For variable loads/stores
+#define RETURN_REG 2    // For function return values
+
 static int registers[NUM_SAVED_REGS];  // Track $s0-$s7 only
 static int currentRegister = NO_REGISTER;
 // Forward declarations
@@ -293,24 +297,35 @@ static int generateArithmeticOp(tree* node) {
     return reg_to_return;
 }
 
+static int getRegisterForPurpose(int purpose) {
+    switch(purpose) {
+        case VALUE_REG:
+            return 0;  // $s0
+        case VAR_ACCESS_REG:
+            return 1;  // $s1
+        case RETURN_REG:
+            return 2;  // $s2
+        default:
+            return nextRegister();  // Fall back to normal allocation for other cases
+    }
+}
+
 static int generateIdentifier(tree* node) {
     if (!node || !node->name) return ERROR_REGISTER;
     
     symEntry* entry = ST_lookup(node->name);
     if (!entry) return ERROR_REGISTER;
     
-    int result = nextRegister();
+    int reg = getRegisterForPurpose(VAR_ACCESS_REG);  // Always use $s1 for variables
     emitInstruction("\t# Variable expression");
     
     if (entry->scope == LOCAL_SCOPE) {
-        // For local variables, always use 4($sp)
-        emitInstruction("\tlw $s%d, 4($sp)", result);
+        emitInstruction("\tlw $s%d, 4($sp)", reg);
     } else {
-        // For global variables
-        emitInstruction("\tlw $s%d, var%s", result, node->name);
+        emitInstruction("\tlw $s%d, var%s", reg, node->name);
     }
     
-    return result;
+    return reg;
 }
 
 static int generateInteger(tree* node) {
@@ -447,25 +462,12 @@ static int generateFunctionCall(tree* node) {
                 emitInstruction("\n\t# Evaluating argument %d", i);
                 int argReg = generateCode(argList->children[i]);
                 
-                // Debug print
-                //printf("DEBUG: Function call argument register: %d\n", argReg);
+                // Store the argument and adjust stack pointer
+                emitInstruction("\t# Storing argument %d", i);
+                emitInstruction("\tsw $s%d, -4($sp)", argReg);
+                emitInstruction("\tsubi $sp, $sp, 8");
                 
-                // Check for valid register from VAR node
-                if (argReg != ERROR_REGISTER && argReg != NO_REGISTER) {
-                    emitInstruction("\t# Storing argument %d", i);
-                    emitInstruction("\tsw $s%d, -4($sp)", argReg);
-                    emitInstruction("\tsubi $sp, $sp, 8");
-                    freeRegister(argReg);
-                } else {
-                    // If we got NO_REGISTER, the value might be in the last used register
-                    int lastReg = getCurrentRegister();
-                    if (lastReg != NO_REGISTER) {
-                        emitInstruction("\t# Storing argument %d", i);
-                        emitInstruction("\tsw $s%d, -4($sp)", lastReg);
-                        emitInstruction("\tsubi $sp, $sp, 8");
-                        freeRegister(lastReg);
-                    }
-                }
+                freeRegister(argReg);
             }
         }
     }
@@ -478,8 +480,10 @@ static int generateFunctionCall(tree* node) {
     if (node->numChildren > 1) {
         tree* argList = node->children[1];
         if (argList && argList->numChildren > 0) {
-            emitInstruction("\n\t# Deallocating space for arguments");
-            emitInstruction("\taddi $sp, $sp, %d", 4);
+            for (int i = 0; i < argList->numChildren; i++) {
+                emitInstruction("\n\t# Deallocating space for arguments");
+                emitInstruction("\taddi $sp, $sp, 4");
+            }
         }
     }
     
@@ -488,9 +492,9 @@ static int generateFunctionCall(tree* node) {
     emitInstruction("\tlw $ra, ($sp)\n");
     
     // Get return value
-    int retReg = nextRegister();
+    int retReg = getRegisterForPurpose(RETURN_REG);
     emitInstruction("\n\t# Move return value into another reg");
-    emitInstruction("\tmove $s%d, $v0", retReg);
+    emitInstruction("\tmove $s%d, $2", retReg);
     
     return retReg;
 }
