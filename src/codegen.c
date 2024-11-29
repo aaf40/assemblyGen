@@ -99,6 +99,8 @@ int generateCode(tree* node) {
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
             }
+            // Generate the output function
+            generateOutputFunction();
             break;
             
         case DECLLIST:
@@ -250,13 +252,14 @@ static int generateIdentifier(tree* node) {
     int t1 = base(node);
     int t2 = offset(node);
     result = nextRegister();
-    emitInstruction("    lw $t%d, %d($t%d)", result, t2, t1);
+    emitInstruction("\tlw $t%d, %d($t%d)", result, t2, t1);
     return result;
 }
 
 static int generateInteger(tree* node) {
     int result = nextRegister();
-    emitInstruction("    li $t%d, %d", result, node->val);
+    emitInstruction("\t# Integer expression");
+    emitInstruction("\tli $t%d, %d", result, node->val);
     return result;
 }
 
@@ -345,9 +348,9 @@ int output(tree* node) {
     int t1 = generateCode(node->children[1]);
     
     // Generate MIPS code to print the number
-    emitInstruction("    move $a0, $t%d", t1);  // Put number in $a0
-    emitInstruction("    li $v0, 1");           // 1 = print integer syscall
-    emitInstruction("    syscall");             // Do the print
+    emitInstruction("\tmove $a0, $t%d", t1);  // Put number in $a0
+    emitInstruction("\tli $v0, 1");           // 1 = print integer syscall
+    emitInstruction("\tsyscall");             // Do the print
     
     freeRegister(t1);
     return NO_REGISTER;
@@ -538,7 +541,7 @@ static char* getFunctionLabel(const char* functionName, const char* prefix) {
 }
 
 static void generateFunctionPrologue(const char* functionName, int numLocalVars) {
-    emitInstruction("\t# Function definition");
+    emitInstruction("\n\t# Function definition");
     emitInstruction("%s:", getFunctionLabel(functionName, "start"));  // e.g., "startmain:"
     
     // Setting up FP
@@ -585,9 +588,6 @@ static void generateFunctionEpilogue(const char* functionName, int numLocalVars)
     // Return to caller
     emitInstruction("\n\t# Return to caller");
     emitInstruction("\tjr $ra");
-
-    // Generate the output function
-    generateOutputFunction();
 }
 
 static void generateOutputFunction(void) {
