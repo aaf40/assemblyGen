@@ -84,77 +84,77 @@ int generateCode(tree* node) {
     }
     
     // Enhanced debug output
-    printf("DEBUG: Processing node type %d (%s)\n", node->nodeKind, nodeNames[node->nodeKind]);
+    //printf("DEBUG: Processing node type %d (%s)\n", node->nodeKind, nodeNames[node->nodeKind]);
     if (node->name) {
-        printf("DEBUG: Node name: %s\n", node->name);
+        //printf("DEBUG: Node name: %s\n", node->name);
     }
-    printf("DEBUG: Number of children: %d\n", node->numChildren);
+    //printf("DEBUG: Number of children: %d\n", node->numChildren);
     
     int result = NO_REGISTER;
     
     // Process this node
     switch(node->nodeKind) {
         case PROGRAM:
-            printf("DEBUG: Handling PROGRAM node\n");
+            //printf("DEBUG: Handling PROGRAM node\n");
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
             }
             break;
             
         case DECLLIST:
-            printf("DEBUG: Handling DECLLIST node with %d children\n", node->numChildren);
+            //printf("DEBUG: Handling DECLLIST node with %d children\n", node->numChildren);
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
             }
             break;
         case FUNDECL:
-        printf("DEBUG: Handling FUNDECL node\n");
-        const char* funcName = node->children[1]->name;
-        generateFunctionPrologue(funcName, 1);
-        for (int i = 0; i < node->numChildren; i++) {
+            //printf("DEBUG: Handling FUNDECL node\n");
+            const char* funcName = node->children[1]->name;
+            generateFunctionPrologue(funcName, 1);
+            for (int i = 0; i < node->numChildren; i++) {
             generateCode(node->children[i]);
         }
         generateFunctionEpilogue(funcName, 1);
         break;
         
     case FUNBODY:
-        printf("DEBUG: Handling FUNBODY node\n");
+        //printf("DEBUG: Handling FUNBODY node\n");
         for (int i = 0; i < node->numChildren; i++) {
             generateCode(node->children[i]);
         }
         break;
         
     case VAR:
-        printf("DEBUG: Handling VAR node\n");
+        //printf("DEBUG: Handling VAR node\n");
         result = generateIdentifier(node->children[0]);
         break;
         
     case EXPRESSION:
-        printf("DEBUG: Handling EXPRESSION node\n");
+        //printf("DEBUG: Handling EXPRESSION node\n");
         result = generateCode(node->children[0]);
         break;
            
         case DECL:
-            printf("DEBUG: Handling DECL node\n");
+            //printf("DEBUG: Handling DECL node\n");
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
             }
             break;
             
         case VARDECL:
-            printf("DEBUG: Handling VARDECL node\n");
+            //printf("DEBUG: Handling VARDECL node\n");
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
             }
             break;
             
         case TYPESPEC:
-            printf("DEBUG: Handling TYPESPECIFIER node\n");
+            //printf("DEBUG: Handling TYPESPECIFIER node\n");
             // No code generation needed for type specifier
             break;
             
         case STATEMENTLIST:
-            printf("DEBUG: Handling STATEMENTLIST node\n");
+            //printf("DEBUG: Handling STATEMENTLIST node\n");
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
             }
@@ -162,49 +162,49 @@ int generateCode(tree* node) {
             
         case ADDOP:
         case MULOP:
-            printf("DEBUG: Handling arithmetic operation\n");
+            //printf("DEBUG: Handling arithmetic operation\n");
             result = generateArithmeticOp(node);
             break;
             
         case RELOP:
-            printf("DEBUG: Handling relational operation\n");
+            //printf("DEBUG: Handling relational operation\n");
             result = generateRelationalOp(node);
             break;
             
         case INTEGER:
-            printf("DEBUG: Handling integer node with value: %d\n", node->val);
+            //printf("DEBUG: Handling integer node with value: %d\n", node->val);
             result = generateInteger(node);
             break;
             
         case IDENTIFIER:
-            printf("DEBUG: Handling identifier\n");
+            //printf("DEBUG: Handling identifier\n");
             result = generateIdentifier(node);
             break;
             
         case ASSIGNSTMT:
-            printf("DEBUG: Handling assignment statement\n");
+            //printf("DEBUG: Handling assignment statement\n");
             result = generateAssignment(node);
             break;
             
         case LOOPSTMT:
-            printf("DEBUG: Handling while loop\n");
+            //printf("DEBUG: Handling while loop\n");
             result = generateWhileLoop(node);
             break;
             
         case CONDSTMT:
-            printf("DEBUG: Handling if statement\n");
+            //printf("DEBUG: Handling if statement\n");
             result = generateIfStatement(node);
             break;
             
         case FUNCCALLEXPR:
-            printf("DEBUG: Handling function call\n");
+            //printf("DEBUG: Handling function call\n");
             result = generateFunctionCall(node);
             break;
             
         default:
-            printf("DEBUG: Unhandled node type %d (%s)\n", 
-                   node->nodeKind, 
-                   nodeNames[node->nodeKind]);
+            //printf("DEBUG: Unhandled node type %d (%s)\n", 
+            //       node->nodeKind, 
+            //       nodeNames[node->nodeKind]);
             // Continue processing children even for unhandled nodes
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
@@ -224,8 +224,8 @@ static int generateArithmeticOp(tree* node) {
         int result_val;
         
         // Debug output to help diagnose
-        printf("DEBUG: Arithmetic op: val1=%d, val2=%d, op=%c\n", 
-               val1, val2, node->val);
+        //printf("DEBUG: Arithmetic op: val1=%d, val2=%d, op=%c\n", 
+        //       val1, val2, node->val);
         
         if (node->nodeKind == ADDOP) {
             result_val = (node->val == '+') ? val1 + val2 : val1 - val2;
@@ -234,8 +234,8 @@ static int generateArithmeticOp(tree* node) {
         }
         
         static int s_reg = 0;
-        emitInstruction("    # Integer expression");
-        emitInstruction("    li $s%d, %d", s_reg, result_val);
+        emitInstruction("\t# Integer expression");
+        emitInstruction("\tli $s%d, %d", s_reg, result_val);
         return s_reg++;
     }
     return NO_REGISTER;
@@ -285,8 +285,8 @@ static int generateRelationalOp(tree* node) {
 
 static int generateAssignment(tree* node) {
     int reg = generateCode(node->children[1]);  // Get the value
-    emitInstruction("    # Assignment");
-    emitInstruction("    sw $s%d, 4($sp)", reg);
+    emitInstruction("\t# Assignment");
+    emitInstruction("\tsw $s%d, 4($sp)", reg);
     return NO_REGISTER;
 }
 
@@ -500,18 +500,18 @@ static int traverseAST(tree* node) {
         default: nodeKindStr = "UNKNOWN"; break;
     }
     
-    printf("DEBUG: Traversing %s node (type %d)%s%s\n", 
-           nodeKindStr,
-           node->nodeKind,
-           node->name ? ", name: " : "",
-           node->name ? node->name : "");
+    //printf("DEBUG: Traversing %s node (type %d)%s%s\n", 
+    //       nodeKindStr,
+    //       node->nodeKind,
+    //       node->name ? ", name: " : "",
+    //       node->name ? node->name : "");
     
     // Print number of children
-    printf("DEBUG: Node has %d children\n", node->numChildren);
+    //printf("DEBUG: Node has %d children\n", node->numChildren);
     
     // Recursively traverse all children
     for (int i = 0; i < node->numChildren; i++) {
-        printf("DEBUG: Processing child %d of %s node\n", i + 1, nodeKindStr);
+        //printf("DEBUG: Processing child %d of %s node\n", i + 1, nodeKindStr);
         traverseAST(node->children[i]);
     }
     
@@ -538,15 +538,17 @@ static char* getFunctionLabel(const char* functionName, const char* prefix) {
 }
 
 static void generateFunctionPrologue(const char* functionName, int numLocalVars) {
-    emitInstruction("# Function definition");
+    emitInstruction("\t# Function definition");
     emitInstruction("%s:", getFunctionLabel(functionName, "start"));  // e.g., "startmain:"
     
     // Setting up FP
+    emitInstruction("\t# Setting up FP");
     emitInstruction("\tsw $fp, ($sp)");
     emitInstruction("\tmove $fp, $sp");
-    emitInstruction("\tsubi $sp, $sp, 4");
+    emitInstruction("\tsubi $sp, $sp, 4\n");
     
     // Saving registers ($s0 to $s7)
+    emitInstruction("\t# Saving registers");
     for (int i = 0; i <= 7; i++) {
         emitInstruction("\tsw $s%d, ($sp)", i);
         emitInstruction("\tsubi $sp, $sp, 4");
@@ -554,8 +556,8 @@ static void generateFunctionPrologue(const char* functionName, int numLocalVars)
     
     // Allocate space for local variables
     if (numLocalVars > 0) {
-        emitInstruction("\t# Allocate space for %d local variables", numLocalVars);
-        emitInstruction("\tsubi $sp, $sp, %d", numLocalVars * 4);
+        emitInstruction("\n\t# Allocate space for %d local variables.", numLocalVars);
+        emitInstruction("\tsubi $sp, $sp, %d\n", numLocalVars * 4);
     }
 }
 
@@ -564,30 +566,38 @@ static void generateFunctionEpilogue(const char* functionName, int numLocalVars)
     
     // Deallocate space for local variables
     if (numLocalVars > 0) {
-        emitInstruction("\t# Deallocate space for %d local variables", numLocalVars);
+        emitInstruction("\n\t# Deallocate space for %d local variables.", numLocalVars);
         emitInstruction("\taddi $sp, $sp, %d", numLocalVars * 4);
     }
     
     // Restoring registers ($s7 to $s0)
+    emitInstruction("\n\t# Reloading registers");
     for (int i = 7; i >= 0; i--) {
         emitInstruction("\taddi $sp, $sp, 4");
         emitInstruction("\tlw $s%d, ($sp)", i);
     }
     
     // Restoring FP
-    emitInstruction("\t# Setting FP back to old value");
+    emitInstruction("\n\t# Setting FP back to old value");
     emitInstruction("\taddi $sp, $sp, 4");
     emitInstruction("\tlw $fp, ($sp)");
     
     // Return to caller
+    emitInstruction("\n\t# Return to caller");
     emitInstruction("\tjr $ra");
+
+    // Generate the output function
+    generateOutputFunction();
 }
 
 static void generateOutputFunction(void) {
     emitInstruction("\n# output function");
     emitInstruction("startoutput:");
+    emitInstruction("\t# Put argument in the output register");
     emitInstruction("\tlw $a0, 4($sp)");
+    emitInstruction("\t# print int is syscall 1");
     emitInstruction("\tli $v0, 1");
     emitInstruction("\tsyscall");
+    emitInstruction("\t# jump back to caller");
     emitInstruction("\tjr $ra");
 }
