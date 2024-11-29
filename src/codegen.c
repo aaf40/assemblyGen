@@ -242,7 +242,7 @@ static int generateArithmeticOp(tree* node) {
         }
         
         static int s_reg = 0;
-        emitInstruction("\t# Integer expression");
+        emitInstruction("\n\t# Integer expression");
         emitInstruction("\tli $s%d, %d", s_reg, result_val);
         return s_reg++;
     }
@@ -266,9 +266,9 @@ static int generateIdentifier(tree* node) {
         emitInstruction("\t# Variable expression");
         // Add 'var' prefix for global variables
         if (entry->scope == GLOBAL_SCOPE) {
-            emitInstruction("\tlw $s%d, var%s", result, node->name);
+            emitInstruction("\tlw $s%d, var%s\n", result, node->name);
         } else {
-            emitInstruction("\tlw $s%d, %s", result, entry->id);
+            emitInstruction("\tlw $s%d, %s\n", result, entry->id);
         }
         return result;
     }
@@ -278,7 +278,7 @@ static int generateIdentifier(tree* node) {
 
 static int generateInteger(tree* node) {
     int result = nextRegister();
-    emitInstruction("\t# Integer expression");
+    emitInstruction("\n\t# Integer expression");
     emitInstruction("\tli $s%d, %d", result, node->val);  // Changed $t to $s
     return result;
 }
@@ -321,9 +321,9 @@ static int generateAssignment(tree* node) {
     
     emitInstruction("\t# Assignment");
     if (entry->scope == GLOBAL_SCOPE) {
-        emitInstruction("\tsw $s%d, var%s", valueReg, id_node->name);
+        emitInstruction("\tsw $s%d, var%s\n", valueReg, id_node->name);
     } else {
-        emitInstruction("\tsw $s%d, 4($fp)", valueReg);
+        emitInstruction("\tsw $s%d, 4($fp)\n", valueReg);
     }
     
     return valueReg;
@@ -405,24 +405,31 @@ static int generateFunctionCall(tree* node) {
             for (int i = 0; i < argList->numChildren; i++) {
                 emitInstruction("\n\t# Evaluating argument %d", i);
                 int argReg = generateCode(argList->children[i]);
+                
+                // Debug print
                 //printf("DEBUG: Function call argument register: %d\n", argReg);
                 
-                // Only proceed if we got a valid register
-                if (argReg >= 0) {  // Changed condition
+                // Check for valid register from VAR node
+                if (argReg != ERROR_REGISTER && argReg != NO_REGISTER) {
                     emitInstruction("\t# Storing argument %d", i);
-                    //printf("DEBUG: Storing argument from register $s%d\n", argReg);
                     emitInstruction("\tsw $s%d, -4($sp)", argReg);
                     emitInstruction("\tsubi $sp, $sp, 8");
                     freeRegister(argReg);
                 } else {
-                    //printf("DEBUG: ERROR - Invalid register returned for argument\n");
-                    // Consider adding error handling here
+                    // If we got NO_REGISTER, the value might be in the last used register
+                    int lastReg = getCurrentRegister();
+                    if (lastReg != NO_REGISTER) {
+                        emitInstruction("\t# Storing argument %d", i);
+                        emitInstruction("\tsw $s%d, -4($sp)", lastReg);
+                        emitInstruction("\tsubi $sp, $sp, 8");
+                        freeRegister(lastReg);
+                    }
                 }
             }
         }
     }
     
-    emitInstruction("\n\t# Jump to callee");
+    emitInstruction("\n\t# Jump to callee\n");
     emitInstruction("\t# jal will correctly set $ra as well");
     emitInstruction("\tjal start%s", node->children[0]->name);
     
@@ -437,7 +444,7 @@ static int generateFunctionCall(tree* node) {
     
     emitInstruction("\n\t# Resetting return address");
     emitInstruction("\taddi $sp, $sp, 4");
-    emitInstruction("\tlw $ra, ($sp)");
+    emitInstruction("\tlw $ra, ($sp)\n");
     
     // Get return value
     int retReg = nextRegister();
