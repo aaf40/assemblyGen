@@ -42,27 +42,6 @@ extern char *nodeNames[];  // Defined in tree.c
 // Register management
 #define MAX_REGISTERS 8  // s0 through s7
 
-static int registerInUse[MAX_REGISTERS] = {0};  // 0 = free, 1 = in use
-static int lastAllocatedRegister = -1;
-
-static int allocateRegister() {
-    // Find next available register
-    int start = (lastAllocatedRegister + 1) % MAX_REGISTERS;
-    int i = start;
-    
-    do {
-        if (!registerInUse[i]) {
-            registerInUse[i] = 1;
-            lastAllocatedRegister = i;
-            return i;
-        }
-        i = (i + 1) % MAX_REGISTERS;
-    } while (i != start);
-    
-    // If we get here, no registers are available
-    return -1;
-}
-
 void initRegisters(void) {
     for (int i = 0; i < NUM_SAVED_REGS; i++) {
         registers[i] = 0;  // Mark all registers as free
@@ -304,21 +283,19 @@ static int evaluateConstExpr(tree* node) {
 }
 
 static int generateArithmeticOp(tree* node) {
+    // Initialize registers if they haven't been
+    if (currentRegister == NO_REGISTER) {
+        initRegisters();
+    }
+    
     // Evaluate the expression at compile time
     int result_value = evaluateConstExpr(node);
+    int reg = nextRegister();  // This will get the next available register
     
-    // Get the next sequential register
-    static int current_reg = 0;  // This will give us s0, s1, s2, s3 in sequence
-    if (current_reg > 3) current_reg = 0;  // Reset after s3
+    fprintf(stdout, "\t# Integer expression\n");
+    fprintf(stdout, "\tli $s%d, %d\n", reg, result_value);
     
-    // Generate the load immediate with the pre-calculated value
-    emitInstruction("\t# Integer expression");
-    emitInstruction("\tli $s%d, %d", current_reg, result_value);
-    
-    int reg_to_return = current_reg;
-    current_reg++;  // Prepare for next use
-    
-    return reg_to_return;
+    return reg;  // Return the register we used
 }
 
 static int getRegisterForPurpose(int purpose) {
@@ -350,16 +327,17 @@ static int generateIdentifier(tree* node) {
 }
 
 static int generateInteger(tree* node) {
-    static int current_reg = 0;
-    if (current_reg > 3) current_reg = 0;
+    // Initialize registers if they haven't been
+    if (currentRegister == NO_REGISTER) {
+        initRegisters();
+    }
     
-    emitInstruction("\n\t# Integer expression");
-    emitInstruction("\tli $s%d, %d", current_reg, node->val);
+    int reg = nextRegister();  // This will get the next available register
     
-    int reg_to_return = current_reg;
-    current_reg++;
+    fprintf(stdout, "\n\t# Integer expression\n");
+    fprintf(stdout, "\tli $s%d, %d\n", reg, node->val);
     
-    return reg_to_return;
+    return reg;  // Return the register we used
 }
 
 static int generateRelationalOp(tree* node) {
@@ -400,7 +378,6 @@ static int generateAssignment(tree* node) {
         }
     }
     
-    freeRegister(valueReg);
     return NO_REGISTER;
 }
 
@@ -468,28 +445,13 @@ int output(tree* node) {
 }
 
 static int generateFunctionCall(tree* node) {
+    // Free all registers before the call
+    initRegisters();
+    
     // Save return address
     fprintf(stdout, "\t# Saving return address\n");
     fprintf(stdout, "\tsw $ra, ($sp)\n");
-    
-    if (strcmp(node->children[0]->name, "output") == 0) {
-        // For output function
-        fprintf(stdout, "\t# Evaluating and storing arguments\n");
-        fprintf(stdout, "\t# Evaluating argument 0\n");
-        fprintf(stdout, "\t# Variable expression\n");
-        
-        int argReg = nextRegister();  // Use existing register allocation
-        fprintf(stdout, "\tlw $s%d, 4($sp)\n", argReg);
-        
-        fprintf(stdout, "\t# Storing argument 0\n");
-        fprintf(stdout, "\tsw $s%d, -4($sp)\n", argReg);
-        fprintf(stdout, "\tsubi $sp, $sp, 8\n");
-        
-        freeRegister(argReg);
-    } else {
-        // For other functions
-        fprintf(stdout, "\tsubi $sp, $sp, 4\n");
-    }
+    fprintf(stdout, "\tsubi $sp, $sp, 4\n");
     
     // Generate function call
     fprintf(stdout, "\t# Jump to callee\n\n");
@@ -497,18 +459,13 @@ static int generateFunctionCall(tree* node) {
     fprintf(stdout, "\tjal start%s\n\n", node->children[0]->name);
     
     // Reset stack and restore return address
-    if (strcmp(node->children[0]->name, "output") == 0) {
-        fprintf(stdout, "\t# Deallocating space for arguments\n");
-        fprintf(stdout, "\taddi $sp, $sp, 4\n");
-    }
-    
     fprintf(stdout, "\t# Resetting return address\n");
     fprintf(stdout, "\taddi $sp, $sp, 4\n");
     fprintf(stdout, "\tlw $ra, ($sp)\n\n");
     
-    // Move return value to next available register
+    // Move return value into another reg
     fprintf(stdout, "\t# Move return value into another reg\n");
-    int returnReg = nextRegister();
+    int returnReg = getRegisterForPurpose(VAR_ACCESS_REG);  // This will always return 1 for $s1
     fprintf(stdout, "\tmove $s%d, $2\n", returnReg);
     
     return returnReg;
