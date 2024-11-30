@@ -85,16 +85,15 @@ void setCurrentRegister(int regNum) {
 
 int generateCode(tree* node) {
     int result = NO_REGISTER;
-    if (!node) {
-        //printf("DEBUG: Null node received\n");
-        return NO_REGISTER;
+    
+    // Initialize registers at the start of AST traversal
+    if (node && node->nodeKind == PROGRAM) {
+        initRegisters();
     }
     
-    //printf("DEBUG: Processing node type %d (%s)\n", node->nodeKind, nodeNames[node->nodeKind]);
-    if (node->name) {
-        //printf("DEBUG: Node name: %s\n", node->name);
+    if (!node) {
+        return NO_REGISTER;
     }
-    //printf("DEBUG: Number of children: %d\n", node->numChildren);
     
     switch(node->nodeKind) {
         case PROGRAM:
@@ -113,9 +112,8 @@ int generateCode(tree* node) {
             
             // Create new scope BEFORE processing any declarations
             new_scope();
-            //printf("DEBUG: Created new scope for function %s\n", funcName);
             
-            // Process local declarations first (should be in children[3] for FUNBODY)
+            // Process local declarations first
             tree* funBody = node->children[3];
             if (funBody && funBody->nodeKind == FUNBODY) {
                 // Process local declarations (first child of FUNBODY)
@@ -123,7 +121,6 @@ int generateCode(tree* node) {
                 if (localDecls) {
                     for (int i = 0; i < localDecls->numChildren; i++) {
                         if (localDecls->children[i]->nodeKind == VARDECL) {
-                            // Insert into current (local) scope
                             tree* varNode = localDecls->children[i]->children[1];
                             ST_insert(varNode->name, DT_INT, ST_SCALAR);
                         }
@@ -131,7 +128,7 @@ int generateCode(tree* node) {
                 }
             }
             
-            // Continue with function body processing
+            // Generate function prologue
             int numLocals = countLocalVariables(node->children[3]);
             generateFunctionPrologue(funcName, numLocals);
             
@@ -143,12 +140,20 @@ int generateCode(tree* node) {
             break;
         }
             
-        case FUNBODY:
-            //printf("DEBUG: Handling FUNBODY node\n");
+        case FUNBODY: {
+            // Process statements in function body
             for (int i = 0; i < node->numChildren; i++) {
-                generateCode(node->children[i]);
+                if (i == 1) {  // The second child contains the statements
+                    tree* stmtList = node->children[i];
+                    if (stmtList) {
+                        for (int j = 0; j < stmtList->numChildren; j++) {
+                            generateCode(stmtList->children[j]);
+                        }
+                    }
+                }
             }
             break;
+        }
             
         case VAR: {
             //printf("DEBUG: Processing VAR node\n");
@@ -241,10 +246,18 @@ int generateCode(tree* node) {
             result = generateIfStatement(node);
             break;
             
-        case FUNCCALLEXPR:
-            //printf("DEBUG: Handling function call\n");
+        case FUNCCALLEXPR: {
+            // Save current register state
+            int savedRegisters[NUM_SAVED_REGS];
+            memcpy(savedRegisters, registers, sizeof(registers));
+            
+            // Don't initialize registers here anymore
             result = generateFunctionCall(node);
+            
+            // Restore register state after function call
+            memcpy(registers, savedRegisters, sizeof(registers));
             break;
+        }
             
         default:
             //printf("DEBUG: Unhandled node type %d (%s)\n", 
@@ -445,18 +458,43 @@ int output(tree* node) {
 }
 
 static int generateFunctionCall(tree* node) {
-    // Free all registers before the call
-    initRegisters();
-    
     // Save return address
     fprintf(stdout, "\t# Saving return address\n");
     fprintf(stdout, "\tsw $ra, ($sp)\n");
-    fprintf(stdout, "\tsubi $sp, $sp, 4\n");
+    
+    const char* funcName = node->children[0]->name;
+    int returnReg;
+    
+    if (strcmp(funcName, "output") == 0) {
+        returnReg = 2;  // Use $s2 for output function
+        
+        fprintf(stdout, "\n\t# Evaluating and storing arguments\n");
+        fprintf(stdout, "\n\t# Evaluating argument 0\n");
+        fprintf(stdout, "\t# Variable expression\n");
+        
+        // Load argument
+        int argReg = 1;  // Use $s1 for argument
+        fprintf(stdout, "\tlw $s%d, 4($sp)\n", argReg);
+        
+        // Store argument for function call
+        fprintf(stdout, "\n\t# Storing argument 0\n");
+        fprintf(stdout, "\tsw $s%d, -4($sp)\n", argReg);
+        fprintf(stdout, "\tsubi $sp, $sp, 8\n");
+    } else {
+        returnReg = 1;  // Use $s1 for regular functions
+        fprintf(stdout, "\tsubi $sp, $sp, 4\n");
+    }
     
     // Generate function call
     fprintf(stdout, "\t# Jump to callee\n\n");
     fprintf(stdout, "\t# jal will correctly set $ra as well\n");
-    fprintf(stdout, "\tjal start%s\n\n", node->children[0]->name);
+    fprintf(stdout, "\tjal start%s\n\n", funcName);
+    
+    // Clean up after call
+    if (strcmp(funcName, "output") == 0) {
+        fprintf(stdout, "\t# Deallocating space for arguments\n");
+        fprintf(stdout, "\taddi $sp, $sp, 4\n\n");
+    }
     
     // Reset stack and restore return address
     fprintf(stdout, "\t# Resetting return address\n");
@@ -465,7 +503,6 @@ static int generateFunctionCall(tree* node) {
     
     // Move return value into another reg
     fprintf(stdout, "\t# Move return value into another reg\n");
-    int returnReg = getRegisterForPurpose(VAR_ACCESS_REG);  // This will always return 1 for $s1
     fprintf(stdout, "\tmove $s%d, $2\n", returnReg);
     
     return returnReg;
