@@ -489,51 +489,63 @@ int output(tree* node) {
 }
 
 static int generateFunctionCall(tree* node) {
-    if (!node || !node->children[0]) {
+    if (!node || !node->children[0] || !node->children[0]->name) 
         return ERROR_REGISTER;
-    }
-
+    
+    char* funcName = node->children[0]->name;
+    fprintf(stderr, "DEBUG: === Function Call Analysis ===\n");
+    fprintf(stderr, "DEBUG: Calling function: %s\n", funcName);
+    fprintf(stderr, "DEBUG: Number of children: %d\n", node->numChildren);
+    fprintf(stderr, "DEBUG: Has arguments: %s\n", node->numChildren > 1 ? "yes" : "no");
+    
     // Save return address
-    fprintf(stdout, "\t# Saving return address\n");
-    fprintf(stdout, "\tsw $ra, ($sp)\n\n");
+    emitInstruction("\t# Saving return address");
+    emitInstruction("\tsw $ra, ($sp)");
     
-    const char* funcName = node->children[0]->name;
-    int returnReg = 2;  // Use $s2 for return value
-    
-    if (strcmp(funcName, "output") == 0 && node->numChildren >= 2) {
-        fprintf(stdout, "\t# Evaluating and storing arguments\n\n");
-        fprintf(stdout, "\t# Evaluating argument 0\n");
-        
-        // Generate code for the argument
-        int argReg = generateCode(node->children[1]);  // This should be $s1
-        
-        // Make sure we're using a valid register
-        if (argReg == NO_REGISTER || argReg == ERROR_REGISTER) {
-            argReg = 1;  // Default to $s1 if no valid register
-        }
-        
-        fprintf(stdout, "\t# Storing argument 0\n");
-        fprintf(stdout, "\tsw $s%d, -4($sp)\n", argReg);
-        fprintf(stdout, "\tsubi $sp, $sp, 8\n\n");
-        
-        fprintf(stdout, "\t# Jump to callee\n\n");
-        fprintf(stdout, "\t# jal will correctly set $ra as well\n");
-        fprintf(stdout, "\tjal start%s\n\n", funcName);
-        
-        fprintf(stdout, "\t# Deallocating space for arguments\n");
-        fprintf(stdout, "\taddi $sp, $sp, 4\n\n");
-        
-        fprintf(stdout, "\t# Resetting return address\n");
-        fprintf(stdout, "\taddi $sp, $sp, 4\n");
-        fprintf(stdout, "\tlw $ra, ($sp)\n\n");
-        
-        fprintf(stdout, "\t# Move return value into another reg\n");
-        fprintf(stdout, "\tmove $s%d, $2\n", returnReg);
-        
-        freeRegister(argReg);
+    // Stack adjustment depends on whether this is a function with arguments
+    if (strcmp(funcName, "output") == 0) {
+        fprintf(stderr, "DEBUG: Output function call - using argument handling\n");
+        // Handle arguments for output function
+        emitInstruction("\n\t# Evaluating and storing arguments\n");
+        emitInstruction("\t# Evaluating argument 0");
+        emitInstruction("\t# Variable expression");
+        emitInstruction("\tlw $s1, 4($sp)");
+        emitInstruction("\t# Storing argument 0");
+        emitInstruction("\tsw $s1, -4($sp)");
+        emitInstruction("\tsubi $sp, $sp, 8");
+    } else {
+        fprintf(stderr, "DEBUG: Regular function call - no argument handling\n");
+        // Regular function call without arguments
+        emitInstruction("\tsubi $sp, $sp, 4");
     }
     
-    return returnReg;
+    // Make the call
+    emitInstruction("\n\t# Jump to callee\n");
+    emitInstruction("\t# jal will correctly set $ra as well");
+    emitInstruction("\tjal start%s\n", funcName);
+    
+    // Cleanup based on function type
+    if (strcmp(funcName, "output") == 0) {
+        emitInstruction("\t# Deallocating space for arguments");
+        emitInstruction("\taddi $sp, $sp, 4");
+    }
+    
+    // Restore return address
+    emitInstruction("\t# Resetting return address");
+    emitInstruction("\taddi $sp, $sp, 4");
+    emitInstruction("\tlw $ra, ($sp)\n");
+    
+    // Move return value - use $s1 for regular functions, $s2 for output
+    emitInstruction("\n\t# Move return value into another reg");
+    if (strcmp(funcName, "output") == 0) {
+        emitInstruction("\tmove $s2, $2\n");
+        fprintf(stderr, "DEBUG: Using $s2 for output function return value\n");
+        return 2;
+    } else {
+        emitInstruction("\tmove $s1, $2\n");
+        fprintf(stderr, "DEBUG: Using $s1 for regular function return value\n");
+        return 1;
+    }
 }
 
 char* generateLabel(const char* prefix) {
