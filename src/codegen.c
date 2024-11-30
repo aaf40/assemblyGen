@@ -495,57 +495,69 @@ static int generateFunctionCall(tree* node) {
     char* funcName = node->children[0]->name;
     fprintf(stderr, "DEBUG: === Function Call Analysis ===\n");
     fprintf(stderr, "DEBUG: Calling function: %s\n", funcName);
-    fprintf(stderr, "DEBUG: Number of children: %d\n", node->numChildren);
-    fprintf(stderr, "DEBUG: Has arguments: %s\n", node->numChildren > 1 ? "yes" : "no");
     
     // Save return address
     emitInstruction("\t# Saving return address");
     emitInstruction("\tsw $ra, ($sp)");
     
-    // Stack adjustment depends on whether this is a function with arguments
-    if (strcmp(funcName, "output") == 0) {
-        fprintf(stderr, "DEBUG: Output function call - using argument handling\n");
-        // Handle arguments for output function
-        emitInstruction("\n\t# Evaluating and storing arguments\n");
-        emitInstruction("\t# Evaluating argument 0");
-        emitInstruction("\t# Variable expression");
-        emitInstruction("\tlw $s1, 4($sp)");
-        emitInstruction("\t# Storing argument 0");
-        emitInstruction("\tsw $s1, -4($sp)");
-        emitInstruction("\tsubi $sp, $sp, 8");
-    } else {
-        fprintf(stderr, "DEBUG: Regular function call - no argument handling\n");
-        // Regular function call without arguments
+    // For regular function calls (not output), just adjust stack and make the call
+    if (strcmp(funcName, "func") == 0) {
         emitInstruction("\tsubi $sp, $sp, 4");
-    }
-    
-    // Make the call
-    emitInstruction("\n\t# Jump to callee\n");
-    emitInstruction("\t# jal will correctly set $ra as well");
-    emitInstruction("\tjal start%s\n", funcName);
-    
-    // Cleanup based on function type
-    if (strcmp(funcName, "output") == 0) {
-        emitInstruction("\t# Deallocating space for arguments");
+        
+        emitInstruction("\n\t# Jump to callee\n");
+        emitInstruction("# jal will correctly set $ra as well");
+        emitInstruction("\tjal start%s\n", funcName);
+        
+        // Restore return address
+        emitInstruction("\t# Resetting return address");
         emitInstruction("\taddi $sp, $sp, 4");
-    }
-    
-    // Restore return address
-    emitInstruction("\t# Resetting return address");
-    emitInstruction("\taddi $sp, $sp, 4");
-    emitInstruction("\tlw $ra, ($sp)\n");
-    
-    // Move return value - use $s1 for regular functions, $s2 for output
-    emitInstruction("\n\t# Move return value into another reg");
-    if (strcmp(funcName, "output") == 0) {
-        emitInstruction("\tmove $s2, $2\n");
-        fprintf(stderr, "DEBUG: Using $s2 for output function return value\n");
-        return 2;
-    } else {
+        emitInstruction("\tlw $ra, ($sp)\n");
+        
+        // Move return value
+        emitInstruction("\n\t# Move return value into another reg");
         emitInstruction("\tmove $s1, $2\n");
-        fprintf(stderr, "DEBUG: Using $s1 for regular function return value\n");
         return 1;
     }
+    
+    // Handle output function specially
+    if (strcmp(funcName, "output") == 0 && node->numChildren > 1) {
+        tree* argList = node->children[1];  // ARGLIST node
+        if (argList->numChildren > 0) {
+            tree* arg = argList->children[0];  // Actual argument node
+            
+            fprintf(stderr, "DEBUG: Processing output argument, kind=%d\n", arg->nodeKind);
+            
+            // Handle global vs local variable
+            if (arg->nodeKind == IDENTIFIER && arg->name) {
+                symEntry* entry = ST_lookup(arg->name);
+                if (entry && entry->scope == GLOBAL_SCOPE) {
+                    emitInstruction("\tlw $s1, var%s", arg->name);
+                } else {
+                    emitInstruction("\tlw $s1, 4($sp)");
+                }
+            }
+            
+            emitInstruction("\tsw $s1, -4($sp)");
+            emitInstruction("\tsubi $sp, $sp, 8");
+            
+            emitInstruction("\n\t# Jump to callee");
+            emitInstruction("# jal will correctly set $ra as well");
+            emitInstruction("\tjal start%s\n", funcName);
+            
+            emitInstruction("\t# Deallocating space for arguments");
+            emitInstruction("\taddi $sp, $sp, 4");
+            
+            emitInstruction("\t# Resetting return address");
+            emitInstruction("\taddi $sp, $sp, 4");
+            emitInstruction("\tlw $ra, ($sp)\n");
+            
+            emitInstruction("\t# Move return value into another reg");
+            emitInstruction("\tmove $s2, $2\n");
+            return 2;
+        }
+    }
+    
+    return ERROR_REGISTER;
 }
 
 char* generateLabel(const char* prefix) {
