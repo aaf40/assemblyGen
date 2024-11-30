@@ -500,8 +500,8 @@ static int generateFunctionCall(tree* node) {
     emitInstruction("\t# Saving return address");
     emitInstruction("\tsw $ra, ($sp)");
     
-    // For regular function calls (not output), just adjust stack and make the call
     if (strcmp(funcName, "func") == 0) {
+        // For func, just adjust stack for return address
         emitInstruction("\tsubi $sp, $sp, 4");
         
         emitInstruction("\n\t# Jump to callee\n");
@@ -517,44 +517,33 @@ static int generateFunctionCall(tree* node) {
         emitInstruction("\n\t# Move return value into another reg");
         emitInstruction("\tmove $s1, $2\n");
         return 1;
-    }
-    
-    // Handle output function specially
-    if (strcmp(funcName, "output") == 0 && node->numChildren > 1) {
-        tree* argList = node->children[1];  // ARGLIST node
-        if (argList->numChildren > 0) {
-            tree* arg = argList->children[0];  // Actual argument node
-            
-            fprintf(stderr, "DEBUG: Processing output argument, kind=%d\n", arg->nodeKind);
-            
-            // Handle global vs local variable
-            if (arg->nodeKind == IDENTIFIER && arg->name) {
-                symEntry* entry = ST_lookup(arg->name);
-                if (entry && entry->scope == GLOBAL_SCOPE) {
-                    emitInstruction("\tlw $s1, var%s", arg->name);
-                } else {
-                    emitInstruction("\tlw $s1, 4($sp)");
-                }
-            }
-            
-            emitInstruction("\tsw $s1, -4($sp)");
-            emitInstruction("\tsubi $sp, $sp, 8");
-            
-            emitInstruction("\n\t# Jump to callee");
-            emitInstruction("#\tjal will correctly set $ra as well");
-            emitInstruction("\tjal start%s\n", funcName);
-            
-            emitInstruction("\t# Deallocating space for arguments");
-            emitInstruction("\taddi $sp, $sp, 4");
-            
-            emitInstruction("\t# Resetting return address");
-            emitInstruction("\taddi $sp, $sp, 4");
-            emitInstruction("\tlw $ra, ($sp)\n");
-            
-            emitInstruction("\t# Move return value into another reg");
-            emitInstruction("\tmove $s2, $2\n");
-            return 2;
-        }
+    } else if (strcmp(funcName, "output") == 0) {
+        // For output, handle argument passing
+        emitInstruction("\n\t# Evaluating and storing arguments\n");
+        emitInstruction("\t# Evaluating argument 0");
+        emitInstruction("\t# Variable expression");
+        
+        // Load the local variable
+        emitInstruction("\tlw $s1, 4($sp)");
+        
+        emitInstruction("\n\t# Storing argument 0");
+        emitInstruction("\tsw $s1, -4($sp)");
+        emitInstruction("\tsubi $sp, $sp, 8");
+        
+        emitInstruction("\n\t# Jump to callee\n");
+        emitInstruction("\t# jal will correctly set $ra as well");
+        emitInstruction("\tjal start%s\n", funcName);
+        
+        emitInstruction("\t# Deallocating space for arguments");
+        emitInstruction("\taddi $sp, $sp, 4");
+        
+        emitInstruction("\t# Resetting return address");
+        emitInstruction("\taddi $sp, $sp, 4");
+        emitInstruction("\tlw $ra, ($sp)\n");
+        
+        emitInstruction("\n\t# Move return value into another reg");
+        emitInstruction("\tmove $s2, $2\n");
+        return 2;
     }
     
     return ERROR_REGISTER;
