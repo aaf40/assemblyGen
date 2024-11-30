@@ -489,51 +489,101 @@ int output(tree* node) {
 }
 
 static int generateFunctionCall(tree* node) {
-    if (!node || !node->children[0]) {
+    if (!node || !node->children[0] || !node->children[0]->name) 
         return ERROR_REGISTER;
-    }
-
+    
+    char* funcName = node->children[0]->name;
+    fprintf(stderr, "DEBUG: === Function Call Analysis ===\n");
+    fprintf(stderr, "DEBUG: Calling function: %s\n", funcName);
+    
     // Save return address
-    fprintf(stdout, "\t# Saving return address\n");
-    fprintf(stdout, "\tsw $ra, ($sp)\n\n");
+    emitInstruction("\t# Saving return address");
+    emitInstruction("\tsw $ra, ($sp)");
     
-    const char* funcName = node->children[0]->name;
-    int returnReg = 2;  // Use $s2 for return value
-    
-    if (strcmp(funcName, "output") == 0 && node->numChildren >= 2) {
-        fprintf(stdout, "\t# Evaluating and storing arguments\n\n");
-        fprintf(stdout, "\t# Evaluating argument 0\n");
+    if (strcmp(funcName, "output") == 0) {
+        emitInstruction("\n\t# Evaluating and storing arguments\n");
+        emitInstruction("\t# Evaluating argument 0");
+        emitInstruction("\t# Variable expression");
         
-        // Generate code for the argument
-        int argReg = generateCode(node->children[1]);  // This should be $s1
-        
-        // Make sure we're using a valid register
-        if (argReg == NO_REGISTER || argReg == ERROR_REGISTER) {
-            argReg = 1;  // Default to $s1 if no valid register
+        // Get the argument list and first argument
+        if (node->children[1]) {  // ARGLIST
+            fprintf(stderr, "DEBUG: Found ARGLIST node (kind=%d)\n", node->children[1]->nodeKind);
+            
+            tree* arglist = node->children[1];
+            if (arglist->children[0]) {  // EXPRESSION
+                tree* expr = arglist->children[0];
+                fprintf(stderr, "DEBUG: Found argument node (kind=%d)\n", expr->nodeKind);
+                
+                if (expr->children[0]) {  // FACTOR
+                    tree* factor = expr->children[0];
+                    fprintf(stderr, "DEBUG: Found factor node (kind=%d)\n", factor->nodeKind);
+                    
+                    if (factor->children[0]) {  // VAR
+                        tree* var = factor->children[0];
+                        fprintf(stderr, "DEBUG: Found var node (kind=%d)\n", var->nodeKind);
+                        
+                        // Check for IDENTIFIER child of VAR
+                        if (var->children[0]) {
+                            tree* id = var->children[0];
+                            fprintf(stderr, "DEBUG: Found identifier node (kind=%d, name=%s)\n",
+                                    id->nodeKind, id->name ? id->name : "NULL");
+                            
+                            if (id->name) {
+                                symEntry* entry = ST_lookup(id->name);
+                                if (entry) {
+                                    fprintf(stderr, "DEBUG: Symbol entry found - scope=%d, id=%s\n",
+                                            entry->scope, entry->id);
+                                    if (entry->scope == GLOBAL_SCOPE) {
+                                        emitInstruction("\tlw $s1, var%s", entry->id);
+                                    } else {
+                                        emitInstruction("\tlw $s1, 4($sp)");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         
-        fprintf(stdout, "\t# Storing argument 0\n");
-        fprintf(stdout, "\tsw $s%d, -4($sp)\n", argReg);
-        fprintf(stdout, "\tsubi $sp, $sp, 8\n\n");
+        emitInstruction("\n\t# Storing argument 0");
+        emitInstruction("\tsw $s1, -4($sp)");
+        emitInstruction("\tsubi $sp, $sp, 8");
         
-        fprintf(stdout, "\t# Jump to callee\n\n");
-        fprintf(stdout, "\t# jal will correctly set $ra as well\n");
-        fprintf(stdout, "\tjal start%s\n\n", funcName);
+        emitInstruction("\n\t# Jump to callee\n");
+        emitInstruction("\t# jal will correctly set $ra as well");
+        emitInstruction("\tjal start%s\n", funcName);
         
-        fprintf(stdout, "\t# Deallocating space for arguments\n");
-        fprintf(stdout, "\taddi $sp, $sp, 4\n\n");
+        emitInstruction("\t# Deallocating space for arguments");
+        emitInstruction("\taddi $sp, $sp, 4");
         
-        fprintf(stdout, "\t# Resetting return address\n");
-        fprintf(stdout, "\taddi $sp, $sp, 4\n");
-        fprintf(stdout, "\tlw $ra, ($sp)\n\n");
+        emitInstruction("\t# Resetting return address");
+        emitInstruction("\taddi $sp, $sp, 4");
+        emitInstruction("\tlw $ra, ($sp)\n");
         
-        fprintf(stdout, "\t# Move return value into another reg\n");
-        fprintf(stdout, "\tmove $s%d, $2\n", returnReg);
+        emitInstruction("\n\t# Move return value into another reg");
+        emitInstruction("\tmove $s2, $2\n");
+        return 2;
+    } else {
+        // For regular function calls
+        emitInstruction("\tsubi $sp, $sp, 4");
         
-        freeRegister(argReg);
+        emitInstruction("\n\t# Jump to callee\n");
+        emitInstruction("\t# jal will correctly set $ra as well");
+        emitInstruction("\tjal start%s\n", funcName);
+        
+        emitInstruction("\t# Resetting return address");
+        emitInstruction("\taddi $sp, $sp, 4");
+        emitInstruction("\tlw $ra, ($sp)\n");
+        
+        // Move return value from $v0 ($2) to a saved register
+        emitInstruction("\n\t# Move return value into another reg");
+        emitInstruction("\tmove $s1, $2\n");
+        
+        return 1;  // Return the register number containing the result
     }
     
-    return returnReg;
+    return ERROR_REGISTER;
 }
 
 char* generateLabel(const char* prefix) {
