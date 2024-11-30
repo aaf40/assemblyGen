@@ -39,6 +39,30 @@ static int labelCounter = 0;
 
 extern char *nodeNames[];  // Defined in tree.c
 
+// Register management
+#define MAX_REGISTERS 8  // s0 through s7
+
+static int registerInUse[MAX_REGISTERS] = {0};  // 0 = free, 1 = in use
+static int lastAllocatedRegister = -1;
+
+static int allocateRegister() {
+    // Find next available register
+    int start = (lastAllocatedRegister + 1) % MAX_REGISTERS;
+    int i = start;
+    
+    do {
+        if (!registerInUse[i]) {
+            registerInUse[i] = 1;
+            lastAllocatedRegister = i;
+            return i;
+        }
+        i = (i + 1) % MAX_REGISTERS;
+    } while (i != start);
+    
+    // If we get here, no registers are available
+    return -1;
+}
+
 void initRegisters(void) {
     for (int i = 0; i < NUM_SAVED_REGS; i++) {
         registers[i] = 0;  // Mark all registers as free
@@ -447,18 +471,24 @@ static int generateFunctionCall(tree* node) {
     // Save return address
     fprintf(stdout, "\t# Saving return address\n");
     fprintf(stdout, "\tsw $ra, ($sp)\n");
-
-    fprintf(stdout, "\t# Evaluating and storing arguments\n");
     
-    // For output function, handle the argument specially
     if (strcmp(node->children[0]->name, "output") == 0) {
+        // For output function
+        fprintf(stdout, "\t# Evaluating and storing arguments\n");
         fprintf(stdout, "\t# Evaluating argument 0\n");
         fprintf(stdout, "\t# Variable expression\n");
-        fprintf(stdout, "\tlw $s1, 4($sp)\n");  // Load from local variable offset
+        
+        int argReg = nextRegister();  // Use existing register allocation
+        fprintf(stdout, "\tlw $s%d, 4($sp)\n", argReg);
         
         fprintf(stdout, "\t# Storing argument 0\n");
-        fprintf(stdout, "\tsw $s1, -4($sp)\n");
+        fprintf(stdout, "\tsw $s%d, -4($sp)\n", argReg);
         fprintf(stdout, "\tsubi $sp, $sp, 8\n");
+        
+        freeRegister(argReg);
+    } else {
+        // For other functions
+        fprintf(stdout, "\tsubi $sp, $sp, 4\n");
     }
     
     // Generate function call
@@ -466,20 +496,22 @@ static int generateFunctionCall(tree* node) {
     fprintf(stdout, "\t# jal will correctly set $ra as well\n");
     fprintf(stdout, "\tjal start%s\n\n", node->children[0]->name);
     
-    // Clean up arguments
-    fprintf(stdout, "\t# Deallocating space for arguments\n");
-    fprintf(stdout, "\taddi $sp, $sp, 4\n");
+    // Reset stack and restore return address
+    if (strcmp(node->children[0]->name, "output") == 0) {
+        fprintf(stdout, "\t# Deallocating space for arguments\n");
+        fprintf(stdout, "\taddi $sp, $sp, 4\n");
+    }
     
-    // Restore return address
     fprintf(stdout, "\t# Resetting return address\n");
     fprintf(stdout, "\taddi $sp, $sp, 4\n");
     fprintf(stdout, "\tlw $ra, ($sp)\n\n");
     
     // Move return value to next available register
     fprintf(stdout, "\t# Move return value into another reg\n");
-    fprintf(stdout, "\tmove $s2, $2\n");  // Always use $s2 for consistency
+    int returnReg = nextRegister();
+    fprintf(stdout, "\tmove $s%d, $2\n", returnReg);
     
-    return 2;  // Return register number 2 ($s2)
+    return returnReg;
 }
 
 char* generateLabel(const char* prefix) {
