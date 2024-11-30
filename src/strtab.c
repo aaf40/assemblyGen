@@ -59,50 +59,54 @@ void ST_set_function_info(symEntry *entry, enum dataType ret_type, param *params
     }
 }
 
-symEntry* ST_insert(char *id, enum dataType d_type, enum symbolType s_type) {
-    int index = hash(id);
-    //printf("DEBUG: ST_insert called for '%s' (type: %d, symtype: %d)\n", id, d_type, s_type);
-    //printf("DEBUG: Current scope is %p (root is %p)\n", (void*)current_scope, (void*)root);
-    
-    // For functions, always insert in global scope
-    table_node* target_scope = (s_type == ST_FUNC) ? root : current_scope;
-    
-    // Check for existing entry in appropriate scope
-    symEntry* existing = target_scope->strTable[index];
-    while (existing) {
-        if (strcmp(existing->id, id) == 0) {
-            if (s_type == ST_FUNC) {
-                //printf("DEBUG: ST_insert - Found duplicate function '%s' in scope %p\n", 
-                //       id, (void*)target_scope);
-                return existing;
-            } else {
-                // For variables, this is a redeclaration error
-                return NULL;
-            }
-        }
-        existing = existing->next;
-    }
-    
-    // Create new entry
-    symEntry* entry = (symEntry*)malloc(sizeof(symEntry));
-    if (!entry) {
-        fprintf(stderr, "Error: Memory allocation failed\n");
+symEntry* ST_insert(char* id, enum dataType d_type, enum symbolType s_type) {
+    if (!current_scope) {
+        fprintf(stderr, "Error: No current scope\n");
         return NULL;
     }
     
-    // Initialize entry
+    // Only use root scope for functions
+    table_node* target_scope = current_scope;
+    if (s_type == ST_FUNC) {
+        target_scope = root;
+    }
+    
+    fprintf(stderr, "DEBUG: ST_insert - id=%s, current_scope=%p, root=%p\n", 
+            id, (void*)current_scope, (void*)root);
+    fprintf(stderr, "DEBUG: ST_insert - target_scope=%p, will_be_global=%d\n", 
+            (void*)target_scope, target_scope == root);
+    
+    // Check if variable already exists in CURRENT scope only
+    symEntry* existing = ST_lookup_in_scope(id, target_scope);
+    if (existing) {
+        fprintf(stderr, "DEBUG: Symbol '%s' already exists in current scope\n", id);
+        return existing;
+    }
+    
+    // Create new entry
+    symEntry* entry = malloc(sizeof(symEntry));
+    if (!entry) return NULL;
+    
     entry->id = strdup(id);
     entry->data_type = d_type;
     entry->sym_type = s_type;
     entry->scope = (target_scope == root) ? GLOBAL_SCOPE : LOCAL_SCOPE;
     
-    // Initialize other fields
-    entry->array_size = 0;
-    entry->return_type = DT_VOID;
-    entry->num_params = 0;
-    entry->params = NULL;
+    // Set parent function for local variables
+    if (target_scope != root) {
+        // Find the enclosing function in the symbol table
+        symEntry* main_entry = ST_lookup("main");  // Or current function
+        if (main_entry) {
+            entry->parent_function = main_entry;
+            fprintf(stderr, "DEBUG: Setting parent function for '%s' to '%s'\n", 
+                    id, main_entry->id);
+        }
+    } else {
+        entry->parent_function = NULL;
+    }
     
-    // Add to appropriate scope's table
+    // Add to scope's table
+    int index = hash(id);
     entry->next = target_scope->strTable[index];
     target_scope->strTable[index] = entry;
     
@@ -144,8 +148,7 @@ int check_param_compatibility(symEntry *func, param *call_params) {
 }
 
 void new_scope(void) {
-    //printf("DEBUG: new_scope - Creating new scope\n");
-    //printf("DEBUG: new_scope - Current scope before: %p (root: %p)\n", 
+    //printf("DEBUG: Creating new scope (current: %p, root: %p)\n", 
     //       (void*)current_scope, (void*)root);
     
     table_node *new_node = (table_node *)malloc(sizeof(table_node));
@@ -181,7 +184,7 @@ void new_scope(void) {
     // Make this the current scope
     current_scope = new_node;
     
-    //printf("DEBUG: new_scope - New scope created: %p\n", (void*)new_node);
+    //printf("DEBUG: New scope created at %p\n", (void*)current_scope);
 }
 
 void up_scope(void) {
@@ -190,6 +193,21 @@ void up_scope(void) {
         current_scope = current_scope->parent;
         //printf("DEBUG: up_scope - New current scope: %p\n", (void*)current_scope);
     }
+}
+
+void end_scope(void) {
+    if (!current_scope) {
+        fprintf(stderr, "Error: No current scope to end\n");
+        return;
+    }
+    
+    if (current_scope == root) {
+        fprintf(stderr, "Warning: Attempting to end root scope\n");
+        return;
+    }
+    
+    // Move back to parent scope
+    current_scope = current_scope->parent;
 }
 
 // Helper function to traverse scopes
@@ -358,6 +376,18 @@ void init_symbol_table(void) {
         memset(root, 0, sizeof(table_node));
         current_scope = root;
     }
+    
+    // Pre-declare the output library function
+    symEntry* output_func = ST_insert("output", DT_VOID, ST_FUNC);
+    
+    // Set up its parameter info
+    param* p = malloc(sizeof(param));
+    p->name = "x";
+    p->data_type = DT_INT;
+    p->symbol_type = ST_SCALAR;
+    p->next = NULL;
+    
+    ST_set_function_info(output_func, DT_VOID, p, 1);
 }
 
 // Adds a semantic error to the error array with the given line number and message.
@@ -758,5 +788,21 @@ void verify_scope_state(void) {
     if (temp != root) {
         fprintf(stderr, "Error: Current scope not properly connected to root\n");
     }
+}
+
+symEntry* ST_lookup_in_scope(char* id, table_node* scope) {
+    if (!scope) return NULL;
+    
+    // Look for the entry in this specific scope
+    for (int i = 0; i < MAXIDS; i++) {
+        symEntry* entry = scope->strTable[i];
+        while (entry) {
+            if (strcmp(entry->id, id) == 0) {
+                return entry;
+            }
+            entry = entry->next;
+        }
+    }
+    return NULL;
 }
 

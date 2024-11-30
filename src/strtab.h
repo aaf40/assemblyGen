@@ -43,6 +43,7 @@ typedef struct symEntry {
     dataType data_type;
     enum symbolType sym_type;
     int scope;                 // GLOBAL_SCOPE or LOCAL_SCOPE
+    int offset;               // Stack offset for local variables
     
     // For arrays
     int array_size;           // Size if array type
@@ -51,6 +52,9 @@ typedef struct symEntry {
     dataType return_type;
     int num_params;            // Number of parameters
     param *params;             // List of parameter types
+    
+    // For scope tracking
+    struct symEntry *parent_function;  // Function that contains this symbol (NULL if global)
     
     struct symEntry *next;     // For hash table collision handling
 } symEntry;
@@ -68,6 +72,7 @@ typedef struct table_node {
 // Function declarations
 symEntry* ST_insert(char *id, dataType d_type, enum symbolType s_type);
 symEntry* ST_lookup(char *id);
+symEntry* ST_lookup_in_scope(char* id, table_node* scope);
 void ST_set_function_info(symEntry *entry, dataType ret_type, param *params, int num_params);
 void add_param(char* name, dataType type, enum symbolType sym_type);
 param* get_param_list(void);
@@ -87,6 +92,8 @@ void validate_array_declaration(int size, int line);
 param* get_param_list(void);
 int count_params(param* params);
 void ST_install_func(char* name, enum dataType type, param* params, int num_params, int line);
+void end_scope(void);
+symEntry* ST_lookup_in_scope(char* id, table_node* scope);
 
 // Define SemanticError type
 typedef struct {
