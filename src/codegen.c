@@ -500,31 +500,51 @@ static int generateFunctionCall(tree* node) {
     emitInstruction("\t# Saving return address");
     emitInstruction("\tsw $ra, ($sp)");
     
-    if (strcmp(funcName, "func") == 0) {
-        // For func, just adjust stack for return address
-        emitInstruction("\tsubi $sp, $sp, 4");
-        
-        emitInstruction("\n\t# Jump to callee\n");
-        emitInstruction("\t# jal will correctly set $ra as well");
-        emitInstruction("\tjal start%s\n", funcName);
-        
-        // Restore return address
-        emitInstruction("\t# Resetting return address");
-        emitInstruction("\taddi $sp, $sp, 4");
-        emitInstruction("\tlw $ra, ($sp)\n");
-        
-        // Move return value
-        emitInstruction("\n\t# Move return value into another reg");
-        emitInstruction("\tmove $s1, $2\n");
-        return 1;
-    } else if (strcmp(funcName, "output") == 0) {
-        // For output, handle argument passing
+    if (strcmp(funcName, "output") == 0) {
         emitInstruction("\n\t# Evaluating and storing arguments\n");
         emitInstruction("\t# Evaluating argument 0");
         emitInstruction("\t# Variable expression");
         
-        // Load the local variable
-        emitInstruction("\tlw $s1, 4($sp)");
+        // Get the argument list and first argument
+        if (node->children[1]) {  // ARGLIST
+            fprintf(stderr, "DEBUG: Found ARGLIST node (kind=%d)\n", node->children[1]->nodeKind);
+            
+            tree* arglist = node->children[1];
+            if (arglist->children[0]) {  // EXPRESSION
+                tree* expr = arglist->children[0];
+                fprintf(stderr, "DEBUG: Found argument node (kind=%d)\n", expr->nodeKind);
+                
+                if (expr->children[0]) {  // FACTOR
+                    tree* factor = expr->children[0];
+                    fprintf(stderr, "DEBUG: Found factor node (kind=%d)\n", factor->nodeKind);
+                    
+                    if (factor->children[0]) {  // VAR
+                        tree* var = factor->children[0];
+                        fprintf(stderr, "DEBUG: Found var node (kind=%d)\n", var->nodeKind);
+                        
+                        // Check for IDENTIFIER child of VAR
+                        if (var->children[0]) {
+                            tree* id = var->children[0];
+                            fprintf(stderr, "DEBUG: Found identifier node (kind=%d, name=%s)\n",
+                                    id->nodeKind, id->name ? id->name : "NULL");
+                            
+                            if (id->name) {
+                                symEntry* entry = ST_lookup(id->name);
+                                if (entry) {
+                                    fprintf(stderr, "DEBUG: Symbol entry found - scope=%d, id=%s\n",
+                                            entry->scope, entry->id);
+                                    if (entry->scope == GLOBAL_SCOPE) {
+                                        emitInstruction("\tlw $s1, var%s", entry->id);
+                                    } else {
+                                        emitInstruction("\tlw $s1, 4($sp)");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         
         emitInstruction("\n\t# Storing argument 0");
         emitInstruction("\tsw $s1, -4($sp)");
@@ -544,6 +564,23 @@ static int generateFunctionCall(tree* node) {
         emitInstruction("\n\t# Move return value into another reg");
         emitInstruction("\tmove $s2, $2\n");
         return 2;
+    } else {
+        // For regular function calls
+        emitInstruction("\tsubi $sp, $sp, 4");
+        
+        emitInstruction("\n\t# Jump to callee\n");
+        emitInstruction("\t# jal will correctly set $ra as well");
+        emitInstruction("\tjal start%s\n", funcName);
+        
+        emitInstruction("\t# Resetting return address");
+        emitInstruction("\taddi $sp, $sp, 4");
+        emitInstruction("\tlw $ra, ($sp)\n");
+        
+        // Move return value from $v0 ($2) to a saved register
+        emitInstruction("\n\t# Move return value into another reg");
+        emitInstruction("\tmove $s1, $2\n");
+        
+        return 1;  // Return the register number containing the result
     }
     
     return ERROR_REGISTER;
