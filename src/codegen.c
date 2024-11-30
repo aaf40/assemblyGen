@@ -505,7 +505,7 @@ static int generateFunctionCall(tree* node) {
         emitInstruction("\tsubi $sp, $sp, 4");
         
         emitInstruction("\n\t# Jump to callee\n");
-        emitInstruction("# jal will correctly set $ra as well");
+        emitInstruction("\t# jal will correctly set $ra as well");
         emitInstruction("\tjal start%s\n", funcName);
         
         // Restore return address
@@ -541,7 +541,7 @@ static int generateFunctionCall(tree* node) {
             emitInstruction("\tsubi $sp, $sp, 8");
             
             emitInstruction("\n\t# Jump to callee");
-            emitInstruction("# jal will correctly set $ra as well");
+            emitInstruction("#\tjal will correctly set $ra as well");
             emitInstruction("\tjal start%s\n", funcName);
             
             emitInstruction("\t# Deallocating space for arguments");
