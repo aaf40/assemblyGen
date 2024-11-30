@@ -93,6 +93,7 @@ param* get_param_list(void);
 int count_params(param* params);
 void ST_install_func(char* name, enum dataType type, param* params, int num_params, int line);
 void end_scope(void);
+symEntry* ST_lookup_in_scope(char* id, table_node* scope);
 
 // Define SemanticError type
 typedef struct {

@@ -60,8 +60,6 @@ void ST_set_function_info(symEntry *entry, enum dataType ret_type, param *params
 }
 
 symEntry* ST_insert(char* id, enum dataType d_type, enum symbolType s_type) {
-    //printf("DEBUG: ST_insert called for '%s' (type: %d, symtype: %d)\n", id, d_type, s_type);
-    
     if (!current_scope) {
         fprintf(stderr, "Error: No current scope\n");
         return NULL;
@@ -71,13 +69,17 @@ symEntry* ST_insert(char* id, enum dataType d_type, enum symbolType s_type) {
     table_node* target_scope = current_scope;
     if (s_type == ST_FUNC) {
         target_scope = root;
-        //printf("DEBUG: Using root scope for function %s\n", id);
     }
     
-    // Check if variable already exists in current scope
+    fprintf(stderr, "DEBUG: ST_insert - id=%s, current_scope=%p, root=%p\n", 
+            id, (void*)current_scope, (void*)root);
+    fprintf(stderr, "DEBUG: ST_insert - target_scope=%p, will_be_global=%d\n", 
+            (void*)target_scope, target_scope == root);
+    
+    // Check if variable already exists in CURRENT scope only
     symEntry* existing = ST_lookup_in_scope(id, target_scope);
     if (existing) {
-        //printf("DEBUG: Symbol '%s' already exists in current scope\n", id);
+        fprintf(stderr, "DEBUG: Symbol '%s' already exists in current scope\n", id);
         return existing;
     }
     
@@ -88,15 +90,26 @@ symEntry* ST_insert(char* id, enum dataType d_type, enum symbolType s_type) {
     entry->id = strdup(id);
     entry->data_type = d_type;
     entry->sym_type = s_type;
-    entry->scope = (target_scope == root && s_type == ST_FUNC) ? GLOBAL_SCOPE : LOCAL_SCOPE;
+    entry->scope = (target_scope == root) ? GLOBAL_SCOPE : LOCAL_SCOPE;
+    
+    // Set parent function for local variables
+    if (target_scope != root) {
+        // Find the enclosing function in the symbol table
+        symEntry* main_entry = ST_lookup("main");  // Or current function
+        if (main_entry) {
+            entry->parent_function = main_entry;
+            fprintf(stderr, "DEBUG: Setting parent function for '%s' to '%s'\n", 
+                    id, main_entry->id);
+        }
+    } else {
+        entry->parent_function = NULL;
+    }
     
     // Add to scope's table
     int index = hash(id);
     entry->next = target_scope->strTable[index];
     target_scope->strTable[index] = entry;
     
-    //printf("DEBUG: Inserted '%s' with scope %d in scope table %p\n", 
-    //       id, entry->scope, (void*)target_scope);
     return entry;
 }
 
@@ -780,18 +793,16 @@ void verify_scope_state(void) {
 symEntry* ST_lookup_in_scope(char* id, table_node* scope) {
     if (!scope) return NULL;
     
-    // Get hash value for id
-    int index = hash(id);
-    
-    // Look for entry in the specified scope only
-    symEntry* entry = scope->strTable[index];
-    while (entry != NULL) {
-        if (strcmp(entry->id, id) == 0) {
-            return entry;
+    // Look for the entry in this specific scope
+    for (int i = 0; i < MAXIDS; i++) {
+        symEntry* entry = scope->strTable[i];
+        while (entry) {
+            if (strcmp(entry->id, id) == 0) {
+                return entry;
+            }
+            entry = entry->next;
         }
-        entry = entry->next;
     }
-    
     return NULL;
 }
 
