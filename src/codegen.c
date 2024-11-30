@@ -453,46 +453,18 @@ static int generateFunctionCall(tree* node) {
 
     emitInstruction("\t# Saving return address");
     emitInstruction("\tsw $ra, ($sp)");
-    
-    emitInstruction("\n\t# Evaluating and storing arguments");
-    if (node->numChildren > 1) {
-        tree* argList = node->children[1];
-        if (argList) {
-            for (int i = 0; i < argList->numChildren; i++) {
-                emitInstruction("\n\t# Evaluating argument %d", i);
-                int argReg = generateCode(argList->children[i]);
-                
-                // Store the argument and adjust stack pointer
-                emitInstruction("\t# Storing argument %d", i);
-                emitInstruction("\tsw $s%d, -4($sp)", argReg);
-                emitInstruction("\tsubi $sp, $sp, 8");
-                
-                freeRegister(argReg);
-            }
-        }
-    }
+    emitInstruction("\tsubi $sp, $sp, 4");
     
     emitInstruction("\n\t# Jump to callee\n");
     emitInstruction("\t# jal will correctly set $ra as well");
     emitInstruction("\tjal start%s", node->children[0]->name);
     
-    // Clean up stack and restore return address
-    if (node->numChildren > 1) {
-        tree* argList = node->children[1];
-        if (argList && argList->numChildren > 0) {
-            for (int i = 0; i < argList->numChildren; i++) {
-                emitInstruction("\n\t# Deallocating space for arguments");
-                emitInstruction("\taddi $sp, $sp, 4");
-            }
-        }
-    }
-    
     emitInstruction("\n\t# Resetting return address");
     emitInstruction("\taddi $sp, $sp, 4");
     emitInstruction("\tlw $ra, ($sp)\n");
     
-    // Get return value
-    int retReg = getRegisterForPurpose(RETURN_REG);
+    // Get return value using $s1 instead of $s2
+    int retReg = getRegisterForPurpose(VAR_ACCESS_REG);  // This will return 1 for $s1
     emitInstruction("\n\t# Move return value into another reg");
     emitInstruction("\tmove $s%d, $2", retReg);
     
