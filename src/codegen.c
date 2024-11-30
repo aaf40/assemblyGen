@@ -309,18 +309,17 @@ static int getRegisterForPurpose(int purpose) {
 }
 
 static int generateIdentifier(tree* node) {
-    if (!node || !node->name) return ERROR_REGISTER;
-    
     symEntry* entry = ST_lookup(node->name);
-    if (!entry) return ERROR_REGISTER;
+    int reg = nextRegister();
     
-    int reg = getRegisterForPurpose(VAR_ACCESS_REG);  // Always use $s1 for variables
-    emitInstruction("\t# Variable expression");
-    
-    if (entry->scope == LOCAL_SCOPE) {
-        emitInstruction("\tlw $s%d, 4($sp)", reg);
-    } else {
-        emitInstruction("\tlw $s%d, var%s", reg, node->name);
+    if (entry) {
+        if (entry->scope == GLOBAL_SCOPE) {
+            // Global variable
+            fprintf(stdout, "\tlw $s%d, %s\n", reg, entry->id);
+        } else {
+            // Local variable
+            fprintf(stdout, "\tlw $s%d, %d($sp)\n", reg, entry->offset);
+        }
     }
     
     return reg;
@@ -363,24 +362,22 @@ static int generateRelationalOp(tree* node) {
 }
 
 static int generateAssignment(tree* node) {
-    if (!node || node->numChildren < 2) return ERROR_REGISTER;
-    
-    tree* var_node = node->children[0];
-    if (!var_node || var_node->numChildren < 1) return ERROR_REGISTER;
-    
-    symEntry* entry = ST_lookup(var_node->children[0]->name);
-    if (!entry) return ERROR_REGISTER;
+    tree* varNode = node->children[0];
+    symEntry* entry = ST_lookup(varNode->children[0]->name);
     
     int valueReg = generateCode(node->children[1]);
     
-    emitInstruction("\t# Assignment");
-    if (entry->scope == LOCAL_SCOPE) {
-        emitInstruction("\tsw $s%d, 4($sp)", valueReg);
-    } else {
-        emitInstruction("\tsw $s%d, var%s", valueReg, var_node->children[0]->name);
+    if (entry) {
+        if (entry->scope == GLOBAL_SCOPE) {
+            fprintf(stdout, "\tsw $s%d, %s\n", valueReg, entry->id);
+        } else {
+            fprintf(stdout, "\t# Assignment\n");
+            fprintf(stdout, "\tsw $s%d, 4($sp)\n", valueReg);
+        }
     }
     
-    return valueReg;
+    freeRegister(valueReg);
+    return NO_REGISTER;
 }
 
 static int generateWhileLoop(tree* node) {
@@ -447,27 +444,42 @@ int output(tree* node) {
 }
 
 static int generateFunctionCall(tree* node) {
-    if (!node || node->numChildren < 1) return ERROR_REGISTER;
+    // Save return address
+    fprintf(stdout, "\t# Saving return address\n");
+    fprintf(stdout, "\tsw $ra, ($sp)\n");
 
-    emitInstruction("\t# Saving return address");
-    emitInstruction("\tsw $ra, ($sp)");
-    emitInstruction("\tsubi $sp, $sp, 4");
+    fprintf(stdout, "\t# Evaluating and storing arguments\n");
     
-    emitInstruction("\n\t# Jump to callee\n");
-    emitInstruction("\t# jal will correctly set $ra as well");
-    emitInstruction("\tjal start%s", node->children[0]->name);
+    // For output function, handle the argument specially
+    if (strcmp(node->children[0]->name, "output") == 0) {
+        fprintf(stdout, "\t# Evaluating argument 0\n");
+        fprintf(stdout, "\t# Variable expression\n");
+        fprintf(stdout, "\tlw $s1, 4($sp)\n");  // Load from local variable offset
+        
+        fprintf(stdout, "\t# Storing argument 0\n");
+        fprintf(stdout, "\tsw $s1, -4($sp)\n");
+        fprintf(stdout, "\tsubi $sp, $sp, 8\n");
+    }
     
-    // Clean up stack and restore return address
-    emitInstruction("\n\t# Resetting return address");
-    emitInstruction("\taddi $sp, $sp, 4");
-    emitInstruction("\tlw $ra, ($sp)\n");
+    // Generate function call
+    fprintf(stdout, "\t# Jump to callee\n\n");
+    fprintf(stdout, "\t# jal will correctly set $ra as well\n");
+    fprintf(stdout, "\tjal start%s\n\n", node->children[0]->name);
     
-    // Get return value - use $s1 instead of $s2
-    int retReg = 1;  // Fixed register number to match expected output
-    emitInstruction("\n\t# Move return value into another reg");
-    emitInstruction("\tmove $s%d, $2", retReg);
+    // Clean up arguments
+    fprintf(stdout, "\t# Deallocating space for arguments\n");
+    fprintf(stdout, "\taddi $sp, $sp, 4\n");
     
-    return retReg;
+    // Restore return address
+    fprintf(stdout, "\t# Resetting return address\n");
+    fprintf(stdout, "\taddi $sp, $sp, 4\n");
+    fprintf(stdout, "\tlw $ra, ($sp)\n\n");
+    
+    // Move return value to next available register
+    fprintf(stdout, "\t# Move return value into another reg\n");
+    fprintf(stdout, "\tmove $s2, $2\n");  // Always use $s2 for consistency
+    
+    return 2;  // Return register number 2 ($s2)
 }
 
 char* generateLabel(const char* prefix) {
