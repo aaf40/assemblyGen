@@ -23,6 +23,7 @@ static int currentRegister = NO_REGISTER;
 static int lastUsedRegister = -1;  // Track the last register used
 
 extern char *nodeNames[]; // defined in tree.c
+extern char *ops[10];
 
 // Forward declarations
 static int generateArithmeticOp(tree* node);
@@ -430,21 +431,108 @@ static int evaluateConstExpr(tree* node) {
 }
 
 static int generateArithmeticOp(tree* node) {
-    // Initialize registers if they haven't been
+    fprintf(stderr, "DEBUG: Entering generateArithmeticOp\n");
+    fprintf(stderr, "\nDEBUG: Tree Node Structure:\n");
+    fprintf(stderr, "Current Node:\n");
+    fprintf(stderr, "  - Kind: %d (%s)\n", node->nodeKind, nodeNames[node->nodeKind]);
+    fprintf(stderr, "  - Value: %d\n", node->val);
+    fprintf(stderr, "  - Operator: %c\n", (char)node->val);
+    
+
     if (currentRegister == NO_REGISTER) {
         initRegisters();
     }
     
-    // Evaluate the expression at compile time
-    int result_value = evaluateConstExpr(node);
-    int reg = nextRegister();  // This will get the next available register
-    
-    fprintf(stdout, "\t# Integer expression\n");
-    fprintf(stdout, "\tli $s%d, %d\n", reg, result_value);
-    
-    return reg;  // Return the register we used
-}
+    if (!node || !node->children[0] || !node->children[1]) {
+        fprintf(stderr, "DEBUG: Invalid node structure\n");
+        return ERROR_REGISTER;
+    }
 
+    //fprintf(stderr, "*********ATTEMPTTING TO STORE node->value into an integer *********\n");
+    int operator_value = node->val;
+    int left = node->children[0]->val;
+    int right = node->children[1]->val;
+    fprintf(stderr, "DEBUG: Left value: %d\n", left);
+    fprintf(stderr, "DEBUG: Right value: %d\n", right);
+    
+    int result = 0;
+    
+    if (node->children[0]->nodeKind == INTEGER && 
+        node->children[1]->nodeKind == INTEGER) {
+        fprintf(stderr, "DEBUG: Both children are INTEGER nodes\n");
+        
+            switch(node->nodeKind) {
+                case ADDOP:
+                    {
+                fprintf(stderr, "DEBUG: Processing ADDOP\n");
+                fprintf(stderr, "*********CHECKING node validity*********\n");
+                if (!node) {
+                    fprintf(stderr, "ERROR: Node is NULL\n");
+                    break;
+                }
+                
+                fprintf(stderr, "*********ATTEMPTING TO STORE node->val into an integer*********\n");
+                int op_val = node->val;
+                fprintf(stderr, "DEBUG: Successfully stored operator value: %d\n", op_val);
+                
+                if (op_val == 43) {  // '+'
+                    result = left + right;
+                    fprintf(stderr, "DEBUG: Addition operation: %d + %d = %d\n", left, right, result);
+                } else {
+                    result = left - right;
+                    fprintf(stderr, "DEBUG: Subtraction operation: %d - %d = %d\n", left, right, result);
+                }
+                
+                // Make sure result is being returned and used
+                fprintf(stderr, "DEBUG: Final result: %d\n", result);
+                int resultReg = nextRegister();
+                emitInstruction("\t# Integer expression");
+                emitInstruction("\tli $s%d, %d", resultReg, result);
+                return resultReg;
+            }
+            break;
+                    
+            case MULOP:
+            {
+                fprintf(stderr, "DEBUG: Processing MULOP\n");
+                fprintf(stderr, "*********CHECKING node validity*********\n");
+                if (!node) {
+                    fprintf(stderr, "ERROR: Node is NULL\n");
+                    break;
+                }
+                
+                fprintf(stderr, "*********ATTEMPTING TO STORE node->val into an integer*********\n");
+                int op_val = node->val;
+                fprintf(stderr, "DEBUG: Successfully stored operator value: %d\n", op_val);
+                
+                if (op_val == 42) {  // '*'
+                    result = 0;
+                    for (int i = 0; i < right; i++) {
+                        result += left;
+                    }
+                    fprintf(stderr, "DEBUG: Multiplication operation\n");
+                } else {
+                    result = 0;
+                    while (left >= right) {
+                        left -= right;
+                        result++;
+                    }
+                    fprintf(stderr, "DEBUG: Division operation\n");
+                    
+                    
+                }
+        
+        fprintf(stderr, "DEBUG: Final result: %d\n", result);
+        int resultReg = nextRegister();
+        emitInstruction("\t# Integer expression");
+        emitInstruction("\tli $s%d, %d", resultReg, result);
+        return resultReg;
+    }
+    
+    return ERROR_REGISTER;
+        }
+}
+}
 static int generateIdentifier(tree* node) {
     //fprintf(stderr, "DEBUG: Enter generateIdentifier\n");
     
@@ -609,14 +697,14 @@ static int generateWhileLoop(tree* node) {
     
     // Generate condition code
     int condReg = generateCode(node->children[0]);
-    emitInstruction("\tbeq $t%d, $0, %s", condReg, endLabel);
+    emitInstruction("\tbeq $s%d, $0, %s", condReg, endLabel);
     freeRegister(condReg);
     
     // Generate loop body
     generateCode(node->children[1]);
     
     // Jump back to start
-    emitInstruction("\tj %s", startLabel);
+    emitInstruction("\tb %s", startLabel);
     emitInstruction("%s:", endLabel);
     
     free(startLabel);
