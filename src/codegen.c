@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-//#include <unistd.h> 
+#include <unistd.h> 
 
 // Register management
 #define MAX_REGISTERS 8  // s0 through s7
@@ -64,13 +64,13 @@ void initRegisters(void) {
 }
 
 int nextRegister(void) {
-    //fprintf(stderr, "DEBUG: Attempting to allocate next register\n");
+    fprintf(stderr, "DEBUG: Attempting to allocate next register\n");
     // Only allocate saved registers ($s0-$s7)
     for (int i = FIRST_SAVED_REG; i <= LAST_SAVED_REG; i++) {
         if (registers[i] == 0) {
             registers[i] = 1;
             currentRegister = i;
-            //fprintf(stderr, "DEBUG: Allocated register $s%d\n", i);
+            fprintf(stderr, "DEBUG: Allocated register $s%d\n", i);
             return i;
         }
     }
@@ -79,13 +79,13 @@ int nextRegister(void) {
 }
 
 void freeRegister(int regNum) {
-    //fprintf(stderr, "DEBUG: Attempting to free register $s%d\n", regNum);
+    fprintf(stderr, "DEBUG: Attempting to free register $s%d\n", regNum);
     if (regNum >= FIRST_SAVED_REG && regNum <= LAST_SAVED_REG) {
         registers[regNum] = 0;
         if (currentRegister == regNum) {
             currentRegister = NO_REGISTER;
         }
-        //fprintf(stderr, "DEBUG: Successfully freed register $s%d\n", regNum);
+        fprintf(stderr, "DEBUG: Successfully freed register $s%d\n", regNum);
     }
 }
 
@@ -110,8 +110,7 @@ int generateCode(tree* node) {
     write(2, buffer, strlen(buffer));
 
     if (node) {
-        //fprintf(stderr, "NODE TYPE: %s | NODE KIND:(%d)\n", 
-                //nodeNames[node->nodeKind], node->nodeKind);
+        fprintf(stderr, "NODE TYPE: %s | NODE KIND:(%d)\n", nodeNames[node->nodeKind], node->nodeKind);
     }
     int result = NO_REGISTER;
     
@@ -126,9 +125,7 @@ int generateCode(tree* node) {
     
     switch(node->nodeKind) {
         case PROGRAM:
-            //fprintf(stderr, "DEBUG: PROGRAM case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             // First pass: preprocess all declarations
             preprocess_declarations(node);
 
@@ -145,9 +142,7 @@ int generateCode(tree* node) {
             
         case FUNDECL: {
             //fprintf(stderr, "\n=== FUNCTION DECLARATION PROCESSING ===\n");
-            //fprintf(stderr, "DEBUG: FUNDECL case reached. Node type: %s, name: %s\n",
-                    //nodeNames[node->nodeKind],
-                    //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             
             const char* funcName = node->children[1] ? node->children[1]->name : "NULL";
             //fprintf(stderr, "DEBUG: Function name: %s\n", funcName);
@@ -176,7 +171,7 @@ int generateCode(tree* node) {
                 for (int i = 0; i < params->numChildren; i++) {
                     tree* param = params->children[i];
                     if (param) {
-                        //fprintf(stderr, "DEBUG: Parameter node type: %s\n", 
+                        ////fprintf(stderr, "DEBUG: Parameter node type: %s\n", 
                                 //nodeNames[param->nodeKind]);
                         
                         // The parameter name might be in a child node
@@ -186,11 +181,11 @@ int generateCode(tree* node) {
                         }
                         
                         if (paramName && paramName->name) {
-                            //fprintf(stderr, "DEBUG: Processing parameter %d: %s\n", 
+                            ////fprintf(stderr, "DEBUG: Processing parameter %d: %s\n", 
                                    // i, paramName->name);
                             symEntry* paramEntry = ST_insert(paramName->name, DT_INT, ST_SCALAR);
                             if (paramEntry) {
-                                //fprintf(stderr, "DEBUG: Successfully added parameter %s\n", 
+                                ////fprintf(stderr, "DEBUG: Successfully added parameter %s\n", 
                                        // paramName->name);
                             }
                         } else {
@@ -235,9 +230,7 @@ int generateCode(tree* node) {
         }
             
         case FUNBODY: {
-            //fprintf(stderr, "DEBUG: FUNBODY case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             // Process statements in function body
             for (int i = 0; i < node->numChildren; i++) {
                 if (i == 1) {  // The second child contains the statements
@@ -253,9 +246,7 @@ int generateCode(tree* node) {
         }
             
         case VAR: {
-            //fprintf(stderr, "DEBUG: VAR case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             
             if (node->parent && node->parent->nodeKind == PROGRAM) {
                 //fprintf(stderr, "DEBUG: VAR - Skipping global variable\n");
@@ -277,18 +268,14 @@ int generateCode(tree* node) {
         }
             
         case EXPRESSION:
-            //fprintf(stderr, "DEBUG: EXPRESSION case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Processing EXPRESSION node\n");
             result = generateCode(node->children[0]);
             //printf("DEBUG: EXPRESSION returning register: %d\n", result);
             return result;
             
         case DECL:
-            //fprintf(stderr, "DEBUG: DECL case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling DECL node\n");
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
@@ -296,9 +283,7 @@ int generateCode(tree* node) {
             break;
             
         case VARDECL:
-            //fprintf(stderr, "DEBUG: VARDECL case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling VARDECL node\n");
             // Check if this is a global or local variable declaration
             if (node->children[1] && node->children[1]->name) {
@@ -320,17 +305,13 @@ int generateCode(tree* node) {
             break;
             
         case TYPESPEC:
-            //fprintf(stderr, "DEBUG: TYPESPEC case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling TYPESPECIFIER node\n");
             // No code generation needed for type specifier
             break;
             
         case STATEMENTLIST:
-            //fprintf(stderr, "DEBUG: STATEMENTLIST case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling STATEMENTLIST node\n");
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
@@ -339,65 +320,49 @@ int generateCode(tree* node) {
             
         case ADDOP:
         case MULOP:
-            //fprintf(stderr, "DEBUG: ADDOP case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling arithmetic operation\n");
             result = generateArithmeticOp(node);
             break;
             
         case RELOP:
-            //fprintf(stderr, "DEBUG: RELOP case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling relational operation\n");
             result = generateRelationalOp(node);
             break;
             
         case INTEGER:
-            //fprintf(stderr, "DEBUG: INTEGER case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling integer node with value: %d\n", node->val);
             result = generateInteger(node);
             break;
             
         case IDENTIFIER:
-            //fprintf(stderr, "DEBUG: IDENTIFIER case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling identifier\n");
             result = generateIdentifier(node);
             break;
             
         case ASSIGNSTMT:
-            //fprintf(stderr, "DEBUG: ASSIGNSTMT case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling assignment statement\n");
             result = generateAssignment(node);
             break;
             
         case LOOPSTMT:
-            //fprintf(stderr, "DEBUG: LOOPSTMT case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling while loop\n");
             result = generateWhileLoop(node);
             break;
             
         case CONDSTMT:
-            //fprintf(stderr, "DEBUG: CONDSTMT case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-           // node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Handling if statement\n");
             result = generateIfStatement(node);
             break;
             
         case FUNCCALLEXPR: {
-            //fprintf(stderr, "DEBUG: FUNCCALLEXPR case reached. Node type: %s, name: %s\n",
-           // nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             // Save current register state
             int savedRegisters[NUM_SAVED_REGS];
             memcpy(savedRegisters, registers, sizeof(registers));
@@ -411,10 +376,10 @@ int generateCode(tree* node) {
         }
             
         case FACTOR: {
-            //fprintf(stderr, "DEBUG: FACTOR case reached\n");
+            fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             // Just pass through the register from the child
             int reg = generateCode(node->children[0]);
-            //fprintf(stderr, "DEBUG: FACTOR - passing through register $s%d\n", reg);
+            fprintf(stderr, "DEBUG: FACTOR - passing through register $s%d\n", reg);
             return reg;
         }
             
@@ -423,9 +388,7 @@ int generateCode(tree* node) {
             //       node->nodeKind, 
             //       nodeNames[node->nodeKind]);
             // Continue processing children even for unhandled nodes
-            //fprintf(stderr, "DEBUG: Default case reached. Node type: %s, name: %s\n",
-            //nodeNames[node->nodeKind],
-            //node->name ? node->name : "(null)");
+            fprintf(stderr, "DEBUG: Default case reached. Node type: %s, name: %s\n", nodeNames[node->nodeKind]);
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
             }
