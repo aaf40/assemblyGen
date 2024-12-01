@@ -15,17 +15,8 @@ char* generateLabel(const char* prefix);
 // Instruction emission
 void emitInstruction(const char* format, ...);
 
-// Memory management helpers
-int hasSeen(const char* name);
-int base(tree* node);
-int offset(tree* node);
-
-// Type checking
-int isCompatibleType(dataType type1, dataType type2);
-const char* typeToString(dataType type);
-
-// Error reporting
-void reportError(const char* format, ...);
+// Generate a unique label for a loop
+char* generateLoopLabel(void);
 
 // Register management functions
 void initRegisters(void);

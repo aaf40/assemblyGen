@@ -15,7 +15,8 @@
 #define VAR_ACCESS_REG 1    // For variable loads/stores
 #define RETURN_REG VAR_ACCESS_REG  // For function return values (same as VAR_ACCESS_REG)
 
-static int labelCounter = 0; // Label counter for unique labels
+static int labelCounter = 0; // Label counter for function and variable labels
+static int loopLabelCounter = 1; // Label counter for loop labels
 static int registers[NUM_SAVED_REGS];  // Track $s0-$s7 only
 static int currentRegister = NO_REGISTER;
 
@@ -422,8 +423,8 @@ static int generateAssignment(tree* node) {
 }
 
 static int generateWhileLoop(tree* node) {
-    char* startLabel = generateLabel("while_start");
-    char* endLabel = generateLabel("while_end");
+    char* startLabel = generateLoopLabel();
+    char* endLabel = generateLoopLabel();
     
     emitInstruction("%s:", startLabel);
     
@@ -571,6 +572,12 @@ static int generateFunctionCall(tree* node) {
 char* generateLabel(const char* prefix) {
     char* label = malloc(50);  // Adjust size as needed
     sprintf(label, "%s_%d", prefix, labelCounter++);
+    return label;
+}
+
+char* generateLoopLabel(void) {
+    char* label = malloc(20);  // Smaller size since format is simpler
+    sprintf(label, "L%d", loopLabelCounter++);
     return label;
 }
 
