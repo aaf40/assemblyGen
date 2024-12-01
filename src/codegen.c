@@ -469,29 +469,25 @@ static int generateArithmeticOp(tree* node) {
     }
 
     int operator_value = node->val;
-    int left = node->children[0]->val;
-    int right = node->children[1]->val;
-    int result = 0;
     
-    // Don't reset register state here anymore
-    
+    // If both operands are integers, we can compute at compile time
     if (node->children[0]->nodeKind == INTEGER && 
         node->children[1]->nodeKind == INTEGER) {
         
+        int left = node->children[0]->val;
+        int right = node->children[1]->val;
+        int result = 0;
+        
         switch(node->nodeKind) {
             case ADDOP: {
-                int op_val = node->val;
-                
-                if (op_val == 43) {  // '+'
+                if (operator_value == 43) {  // '+'
                     result = left + right;
                 } else {
                     result = left - right;
                 }
                 
-                // Get next available register using improved allocation
                 int resultReg = nextRegister();
                 fprintf(stderr, "DEBUG: Allocated register $s%d for arithmetic result\n", resultReg);
-
                 
                 fprintf(stderr, "DEBUG: generateArithmeticOp\n");
                 fprintf(stderr, "  Node address: %p\n", (void*)node);
@@ -502,16 +498,13 @@ static int generateArithmeticOp(tree* node) {
                 fprintf(stderr, "  Parent node kind: %s\n", node->parent ? nodeNames[node->parent->nodeKind] : "NO_PARENT");
                 fprintf(stderr, " Node data type $s%d\n", node->type);
 
-                fprintf(stderr, "BUG IN GENERATE_ARITHMETIC_OP\n", resultReg);
                 emitInstruction("\t# Integer expression");
                 emitInstruction("\tli $s%d, %d", resultReg, result);
                 return resultReg;
             }
             
             case MULOP: {
-                int op_val = node->val;
-                
-                if (op_val == 42) {  // '*'
+                if (operator_value == 42) {  // '*'
                     result = 0;
                     for (int i = 0; i < right; i++) {
                         result += left;
@@ -537,29 +530,26 @@ static int generateArithmeticOp(tree* node) {
                 return ERROR_REGISTER;
         }
     } else {
-        // If operands aren't both integers, generate code for runtime computation
+        // Runtime computation needed - generate actual arithmetic instructions
         int leftReg = generateCode(node->children[0]);
         int rightReg = generateCode(node->children[1]);
         int resultReg = nextRegister();
         
+        emitInstruction("\t# Arithmetic expression");
         switch(node->nodeKind) {
             case ADDOP:
                 if (operator_value == 43) {  // '+'
-                    emitInstruction("\t# Integer expression");
-                    emitInstruction("\tli $s%d, %d", resultReg, result);
+                    emitInstruction("\tadd $s%d, $s%d, $s%d", resultReg, leftReg, rightReg);
                 } else {
-                    emitInstruction("\t# Integer expression");
-                    emitInstruction("\tli  $s%d, %d", resultReg, result);
+                    emitInstruction("\tsub $s%d, $s%d, $s%d", resultReg, leftReg, rightReg);
                 }
                 break;
                 
             case MULOP:
                 if (operator_value == 42) {  // '*'
-                    emitInstruction("\t# Integer expression");
-                    emitInstruction("\tli $s%d, %d", resultReg, result);
+                    emitInstruction("\tmul $s%d, $s%d, $s%d", resultReg, leftReg, rightReg);
                 } else {
-                    emitInstruction("\t# Integer expression");
-                    emitInstruction("\tli $s%d, %d", resultReg, result);
+                    emitInstruction("\tdiv $s%d, $s%d, $s%d", resultReg, leftReg, rightReg);
                 }
                 break;
         }
@@ -660,6 +650,7 @@ static int generateInteger(tree* node) {
     fprintf(stderr, " Node data type $s%d\n", node->type);
 
     fprintf(stderr, "BUG IN GENERATE_INTEGER\n");
+    fprintf(stderr, "# Integer expression\n");
     emitInstruction("\tli $s%d, %d", reg, node->val);
     return reg;
 }
