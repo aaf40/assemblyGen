@@ -7,6 +7,7 @@
 struct treenode;
 typedef struct treenode tree;
 
+
 // Data types for variables and functions
 typedef enum dataType {
     DT_INT,     // Instead of INT_TYPE
@@ -15,6 +16,8 @@ typedef enum dataType {
     DT_ARRAY,   // Instead of ARRAY_TYPE
     DT_FUNC     // Instead of FUNCTION_TYPE
 } dataType;
+
+extern tree* current_tree;
 
 #define MAXIDS 1000
 #define GLOBAL_SCOPE 0
@@ -70,6 +73,7 @@ typedef struct table_node {
 } table_node;
 
 // Function declarations
+int has_global_scope(tree* node);
 symEntry* ST_insert(char *id, dataType d_type, enum symbolType s_type);
 symEntry* ST_lookup(char *id);
 symEntry* ST_lookup_in_scope(char* id, table_node* scope);

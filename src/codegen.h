@@ -29,4 +29,7 @@ void setCurrentRegister(int regNum);
 int generateCode(tree* node);
 int output(tree* node);
 
+// Current tree node
+extern tree* current_tree;
+
 #endif

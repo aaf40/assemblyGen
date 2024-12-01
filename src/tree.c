@@ -159,6 +159,7 @@ void analyzeFunctionDecl(tree *node) {
     }
     
     // Create new scope for parameters and body
+    fprintf(stderr, "DEBUG: we are inside analyzeFunctionDecl and has been new_scope() called\n");
     new_scope();
     
     // Analyze parameters (formalDeclList is second child)

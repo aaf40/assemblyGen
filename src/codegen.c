@@ -112,7 +112,7 @@ int generateCode(tree* node) {
         case PROGRAM:
             // First pass: preprocess all declarations
             preprocess_declarations(node);
-            
+
             // Now generate code with complete information
             generateHeader(stdout);
             generateMainSetup();
@@ -619,7 +619,11 @@ static void generateHeader(FILE* fp) {
         for (int i = 0; i < MAXIDS; i++) {
             symEntry* entry = root->strTable[i];
             while (entry) {
-                if (entry->scope == GLOBAL_SCOPE && 
+                // Create a temporary tree node to check scope
+                tree* temp_node = maketree(IDENTIFIER);
+                setName(temp_node, entry->id);
+                
+                if (has_global_scope(temp_node) && 
                     entry->sym_type == ST_SCALAR && 
                     entry->data_type == DT_INT &&
                     strcmp(entry->id, "main") != 0 && 
@@ -635,6 +639,11 @@ static void generateHeader(FILE* fp) {
                         hasGlobals = true;
                     }
                 }
+                
+                // Clean up temporary node
+                free(temp_node->name);
+                free(temp_node);
+                
                 entry = entry->next;
             }
         }
