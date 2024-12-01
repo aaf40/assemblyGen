@@ -492,7 +492,7 @@ static int generateArithmeticOp(tree* node) {
                 int resultReg = nextRegister();
                 fprintf(stderr, "DEBUG: Allocated register $s%d for arithmetic result\n", resultReg);
 
-                fprintf(stderr, "BUG HERE\n", resultReg);
+                
                 fprintf(stderr, "DEBUG: generateArithmeticOp\n");
                 fprintf(stderr, "  Node address: %p\n", (void*)node);
                 fprintf(stderr, "  Node kind: %d (%s)\n", node->nodeKind, nodeNames[node->nodeKind]);
@@ -500,7 +500,9 @@ static int generateArithmeticOp(tree* node) {
                 fprintf(stderr, "  Node name: %s\n", node->name ? node->name : "(null)");
                 fprintf(stderr, "  Number of children: %d\n", node->numChildren);
                 fprintf(stderr, "  Parent node kind: %s\n", node->parent ? nodeNames[node->parent->nodeKind] : "NO_PARENT");
-                fprintf(stderr, "  Allocated register: $s%d\n", resultReg);
+                fprintf(stderr, " Node data type $s%d\n", node->type);
+
+                fprintf(stderr, "BUG IN GENERATE_ARITHMETIC_OP\n", resultReg);
                 emitInstruction("\t# Integer expression");
                 emitInstruction("\tli $s%d, %d", resultReg, result);
                 return resultReg;
@@ -647,7 +649,7 @@ static int generateInteger(tree* node) {
     int reg = nextRegister();  // Get next available register instead of hardcoding
     fprintf(stderr, "DEBUG: Allocated register $s%d for arithmetic result\n", reg);
 
-    fprintf(stderr, "BUG THERE");
+    
     fprintf(stderr, "DEBUG: generateInteger\n");
     fprintf(stderr, "  Node address: %p\n", (void*)node);
     fprintf(stderr, "  Node kind: %d (%s)\n", node->nodeKind, nodeNames[node->nodeKind]);
@@ -655,8 +657,9 @@ static int generateInteger(tree* node) {
     fprintf(stderr, "  Node name: %s\n", node->name ? node->name : "(null)");
     fprintf(stderr, "  Number of children: %d\n", node->numChildren);
     fprintf(stderr, "  Parent node kind: %s\n", node->parent ? nodeNames[node->parent->nodeKind] : "NO_PARENT");
-    fprintf(stderr, "  Allocated register: $s%d\n", reg);
+    fprintf(stderr, " Node data type $s%d\n", node->type);
 
+    fprintf(stderr, "BUG IN GENERATE_INTEGER\n");
     emitInstruction("\tli $s%d, %d", reg, node->val);
     return reg;
 }
