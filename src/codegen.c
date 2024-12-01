@@ -43,8 +43,9 @@ static void generateOutputFunction(void);
 static int countLocalVariables(tree* funBody);
 static bool will_be_local_variable(tree* node, const char* var_name);
 static void preprocess_declarations(tree* node);
-static void freeAllRegisters(void);
+//static void freeAllRegisters(void);
 static int nextRegister(void);
+static void resetRegisters(void);
 
 // Function to generate MIPS code for output
 int output(tree* node) {
@@ -60,7 +61,7 @@ int output(tree* node) {
     return NO_REGISTER;
 }
 
-static void freeAllRegisters(void) {
+/*static void freeAllRegisters(void) {
     fprintf(stderr, "DEBUG: Freeing all registers\n");
     for (int i = 0; i < NUM_REGISTERS; i++) {
         if (registers[i]) {
@@ -68,7 +69,7 @@ static void freeAllRegisters(void) {
             registers[i] = false;
         }
     }
-}
+}*/
 
 void initRegisters(void) {
     for (int i = 0; i < NUM_SAVED_REGS; i++) {
@@ -96,6 +97,13 @@ void freeRegister(int regNum) {
             currentRegister = NO_REGISTER;
         }
         fprintf(stderr, "DEBUG: Successfully freed register $s%d\n", regNum);
+    }
+}
+
+static void resetRegisters(void) {
+    lastUsedRegister = -1;  // Resets the counter for next available register
+    for (int i = 0; i < NUM_REGISTERS; i++) {
+        registers[i] = false;  // Marks ALL registers as available
     }
 }
 
@@ -271,17 +279,23 @@ int generateCode(tree* node) {
                 }
             }
             
-            //fprintf(stderr, "DEBUG: VAR - About to call generateIdentifier\n");
+            fprintf(stderr, "DEBUG: VAR - About to call generateIdentifier\n");
             int reg = generateIdentifier(node->children[0]);
-            //fprintf(stderr, "DEBUG: VAR - generateIdentifier returned $s%d\n", reg);
+            fprintf(stderr, "DEBUG: VAR - generateIdentifier returned $s%d\n", reg);
             return reg;
         }
             
         case EXPRESSION:
             fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             //printf("DEBUG: Processing EXPRESSION node\n");
+            printf("DEBUG: CALLING GENERATECODE ON NODE: %d\n", node->children[0]->nodeKind);
+            printf("DEBUG: CALLING GENERATECODE ON NODE: %d\n", node->children[0]->name);
+            printf("DEBUG: CALLING GENERATECODE ON NODE: %d\n", node->children[0]->val);
             result = generateCode(node->children[0]);
-            //printf("DEBUG: EXPRESSION returning register: %d\n", result);
+            printf("DEBUG: FINISHED GENERATECODE ON node->children[0]->nodeKind: %d\n", node->children[0]->nodeKind);
+            printf("DEBUG: FINISHED GENERATECODE ON node->children[0]->name: %d\n", node->children[0]->name);
+            printf("DEBUG: FINISHED GENERATECODE ON node->children[0]->val: %d\n", node->children[0]->val);
+            printf("DEBUG: EXPRESSION returning register: %d\n", result);
             return result;
             
         case DECL:
@@ -388,6 +402,7 @@ int generateCode(tree* node) {
         case FACTOR: {
             fprintf(stderr, "CASE: %s Node type: %s, Node name: %s\n", nodeNames[node->nodeKind], node->name ? node->name : "(null)");
             // Just pass through the register from the child
+            
             int reg = generateCode(node->children[0]);
             fprintf(stderr, "DEBUG: FACTOR - passing through register $s%d\n", reg);
             return reg;
@@ -439,12 +454,14 @@ static int generateArithmeticOp(tree* node) {
     fprintf(stderr, "  - Operator: %c\n", (char)node->val);
     
 
-    if (currentRegister == NO_REGISTER) {
+    /*if (currentRegister == NO_REGISTER) {
+        fprintf(stderr, "*********INIT REGISTER INSIDE OF generateArithmeticOp *********\n");
         initRegisters();
-    }
+    }*/
     
     if (!node || !node->children[0] || !node->children[1]) {
         fprintf(stderr, "DEBUG: Invalid node structure\n");
+        fprintf(stderr, "**GENERATEARITHMETIC ABOUT TO RETURN -1 (ERROR_REGISTER)***\n");
         return ERROR_REGISTER;
     }
 
@@ -452,39 +469,39 @@ static int generateArithmeticOp(tree* node) {
     int operator_value = node->val;
     int left = node->children[0]->val;
     int right = node->children[1]->val;
-    fprintf(stderr, "DEBUG: Left value: %d\n", left);
-    fprintf(stderr, "DEBUG: Right value: %d\n", right);
+    //fprintf(stderr, "DEBUG: Left value: %d\n", left);
+    //fprintf(stderr, "DEBUG: Right value: %d\n", right);
     
     int result = 0;
     
     if (node->children[0]->nodeKind == INTEGER && 
         node->children[1]->nodeKind == INTEGER) {
-        fprintf(stderr, "DEBUG: Both children are INTEGER nodes\n");
+        //fprintf(stderr, "DEBUG: Both children are INTEGER nodes\n");
         
             switch(node->nodeKind) {
                 case ADDOP:
                     {
-                fprintf(stderr, "DEBUG: Processing ADDOP\n");
-                fprintf(stderr, "*********CHECKING node validity*********\n");
+                //fprintf(stderr, "DEBUG: Processing ADDOP\n");
+                //fprintf(stderr, "*********CHECKING node validity*********\n");
                 if (!node) {
                     fprintf(stderr, "ERROR: Node is NULL\n");
                     break;
                 }
                 
-                fprintf(stderr, "*********ATTEMPTING TO STORE node->val into an integer*********\n");
+                //fprintf(stderr, "*********ATTEMPTING TO STORE node->val into an integer*********\n");
                 int op_val = node->val;
-                fprintf(stderr, "DEBUG: Successfully stored operator value: %d\n", op_val);
+                //fprintf(stderr, "DEBUG: Successfully stored operator value: %d\n", op_val);
                 
                 if (op_val == 43) {  // '+'
                     result = left + right;
-                    fprintf(stderr, "DEBUG: Addition operation: %d + %d = %d\n", left, right, result);
+                    //fprintf(stderr, "DEBUG: Addition operation: %d + %d = %d\n", left, right, result);
                 } else {
                     result = left - right;
-                    fprintf(stderr, "DEBUG: Subtraction operation: %d - %d = %d\n", left, right, result);
+                    //fprintf(stderr, "DEBUG: Subtraction operation: %d - %d = %d\n", left, right, result);
                 }
                 
                 // Make sure result is being returned and used
-                fprintf(stderr, "DEBUG: Final result: %d\n", result);
+                //fprintf(stderr, "DEBUG: Final result: %d\n", result);
                 int resultReg = nextRegister();
                 emitInstruction("\t# Integer expression");
                 emitInstruction("\tli $s%d, %d", resultReg, result);
@@ -494,41 +511,42 @@ static int generateArithmeticOp(tree* node) {
                     
             case MULOP:
             {
-                fprintf(stderr, "DEBUG: Processing MULOP\n");
-                fprintf(stderr, "*********CHECKING node validity*********\n");
+                //fprintf(stderr, "DEBUG: Processing MULOP\n");
+                //fprintf(stderr, "*********CHECKING node validity*********\n");
                 if (!node) {
                     fprintf(stderr, "ERROR: Node is NULL\n");
                     break;
                 }
                 
-                fprintf(stderr, "*********ATTEMPTING TO STORE node->val into an integer*********\n");
+                //fprintf(stderr, "*********ATTEMPTING TO STORE node->val into an integer*********\n");
                 int op_val = node->val;
-                fprintf(stderr, "DEBUG: Successfully stored operator value: %d\n", op_val);
+                //fprintf(stderr, "DEBUG: Successfully stored operator value: %d\n", op_val);
                 
                 if (op_val == 42) {  // '*'
                     result = 0;
                     for (int i = 0; i < right; i++) {
                         result += left;
                     }
-                    fprintf(stderr, "DEBUG: Multiplication operation\n");
+                    //fprintf(stderr, "DEBUG: Multiplication operation\n");
                 } else {
                     result = 0;
                     while (left >= right) {
                         left -= right;
                         result++;
                     }
-                    fprintf(stderr, "DEBUG: Division operation\n");
+                    //fprintf(stderr, "DEBUG: Division operation\n");
                     
                     
                 }
         
-        fprintf(stderr, "DEBUG: Final result: %d\n", result);
+        //fprintf(stderr, "DEBUG: Final result: %d\n", result);
         int resultReg = nextRegister();
         emitInstruction("\t# Integer expression");
         emitInstruction("\tli $s%d, %d", resultReg, result);
         return resultReg;
     }
     
+    fprintf(stderr, "**GENERATEARITHMETIC ABOUT TO RETURN -1***\n");
     return ERROR_REGISTER;
         }
 }
@@ -682,33 +700,42 @@ static int generateAssignment(tree* node) {
         // Case 3: Local variable
         else {
             emitInstruction("\t# Assignment");
-            emitInstruction("\tsw $s%d, 4($sp)", valueReg);  // Changed from 0($sp) to 4($sp)
+            emitInstruction("\tsw $s%d, TEST4($sp)", valueReg);  // Changed from 0($sp) to 4($sp)
         }
     }
     
     return valueReg;
 }
 
+
+
 static int generateWhileLoop(tree* node) {
+    fprintf(stderr, "\nDEBUG: ===== While Loop Start =====\n");
+    fprintf(stderr, "DEBUG: Initial lastUsedRegister: %d\n", lastUsedRegister);
+    
     char* startLabel = generateLoopLabel();
     char* endLabel = generateLoopLabel();
     
     emitInstruction("%s:", startLabel);
     
     // Generate condition code
+    fprintf(stderr, "DEBUG: Generating condition code...\n");
     int condReg = generateCode(node->children[0]);
+    fprintf(stderr, "DEBUG: Condition uses register $s%d\n", condReg);
+    
     emitInstruction("\tbeq $s%d, $0, %s", condReg, endLabel);
     freeRegister(condReg);
     
     // Generate loop body
+    fprintf(stderr, "DEBUG: Generating loop body...\n");
+    fprintf(stderr, "DEBUG: lastUsedRegister before body: %d\n", lastUsedRegister);
     generateCode(node->children[1]);
+    fprintf(stderr, "DEBUG: lastUsedRegister after body: %d\n", lastUsedRegister);
     
-    // Jump back to start
     emitInstruction("\tb %s", startLabel);
     emitInstruction("%s:", endLabel);
     
-    free(startLabel);
-    free(endLabel);
+    fprintf(stderr, "DEBUG: ===== While Loop End =====\n\n");
     return NO_REGISTER;
 }
 
