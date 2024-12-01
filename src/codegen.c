@@ -466,7 +466,11 @@ static int generateIdentifier(tree* node) {
         
         if (entry->scope == GLOBAL_SCOPE) {
             emitInstruction("\tlw $s%d, var%s", reg, entry->id);
-        } else {
+        } else if (entry->scope == LOCAL_SCOPE && 
+            entry->parent_function != NULL && 
+            entry->offset > 0) {
+            emitInstruction("\tlw $s%d, %d($fp)", reg, entry->offset);
+        }else {
             emitInstruction("\tlw $s%d, 4($fp)", reg);
         }
         //fprintf(stderr, "DEBUG: generateIdentifier - emitted load instruction\n");
@@ -540,15 +544,25 @@ static int generateAssignment(tree* node) {
     }
     
     symEntry* entry = ST_lookup(varNode->children[0]->name);
-    int valueReg = generateCode(node->children[1]);  // This should be $s0
-    
-    if (entry && entry->id) {
+    int valueReg = generateCode(node->children[1]);
+
+    if (entry) {
+        // Case 1: Global variable
         if (entry->scope == GLOBAL_SCOPE) {
-            fprintf(stdout, "\t# Assignment\n");  // Removed "to local variable"
-            fprintf(stdout, "\tsw $s%d, var%s\n", valueReg, entry->id);
-        } else {
-            fprintf(stdout, "\t# Assignment\n");  // Changed to match expected output
-            fprintf(stdout, "\tsw $s%d, 4($sp)\n", valueReg);
+            emitInstruction("\t# Assignment");
+            emitInstruction("\tsw $s%d, var%s", valueReg, entry->id);
+        }
+        // Case 2: Parameter (local scope with parent function and positive offset)
+        else if (entry->scope == LOCAL_SCOPE && 
+                entry->parent_function != NULL && 
+                entry->offset > 0) {
+            emitInstruction("\t# Assignment");
+            emitInstruction("\tsw $s%d, %d($fp)", valueReg, entry->offset);
+        }
+        // Case 3: Local variable
+        else {
+            emitInstruction("\t# Assignment");
+            emitInstruction("\tsw $s%d, 4($sp)", valueReg);  // Changed from 0($sp) to 4($sp)
         }
     }
     
@@ -563,7 +577,7 @@ static int generateWhileLoop(tree* node) {
     
     // Generate condition code
     int condReg = generateCode(node->children[0]);
-    emitInstruction("\tbeq $t%d, $zero, %s", condReg, endLabel);
+    emitInstruction("\tbeq $t%d, $0, %s", condReg, endLabel);
     freeRegister(condReg);
     
     // Generate loop body
