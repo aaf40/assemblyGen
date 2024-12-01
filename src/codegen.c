@@ -755,7 +755,10 @@ static void generateHeader(FILE* fp) {
     
     fprintf(stderr, "DEBUG: === generateHeader called ===\n");
     
+    // Create a hash table or array to track printed variables
+    bool printed_vars[MAXIDS] = {false};  // Initialize all to false
     bool hasGlobals = false;
+    
     if (root) {
         for (int i = 0; i < MAXIDS; i++) {
             symEntry* entry = root->strTable[i];
@@ -767,9 +770,14 @@ static void generateHeader(FILE* fp) {
                     strcmp(entry->id, "output") != 0 &&
                     entry->parent_function == NULL) {
                     
-                    fprintf(stderr, "DEBUG: Found truly global variable '%s'\n", entry->id);
-                    fprintf(fp, "var%s:\t.word 0\n", entry->id);
-                    hasGlobals = true;
+                    // Check if we've already printed this variable
+                    int hash = entry->id[0] % MAXIDS;  // Simple hash function
+                    if (!printed_vars[hash]) {
+                        fprintf(stderr, "DEBUG: Found truly global variable '%s'\n", entry->id);
+                        fprintf(fp, "var%s:\t.word 0\n", entry->id);
+                        printed_vars[hash] = true;
+                        hasGlobals = true;
+                    }
                 }
                 entry = entry->next;
             }

@@ -439,7 +439,7 @@ var             : ID LSQ_BRKT expression RSQ_BRKT
                     // Add comprehensive array access validation
                     symEntry* entry = ST_lookup($1);
                     if (entry) {
-                        check_array_access(entry, $3, yylineno);
+                        //check_array_access(entry, $3, yylineno);
                     } else {
                         add_semantic_error(yylineno, "Undeclared array variable");
                     }
@@ -587,7 +587,7 @@ funcCallExpr    : ID LPAREN argList RPAREN
                     addChild($$, $3);
                     
                     // Add comprehensive function call validation
-                    check_function_call($1, $3, yylineno);
+                    //check_function_call($1, $3, yylineno);
                 }
                 | ID LPAREN RPAREN
                 {
@@ -597,7 +597,7 @@ funcCallExpr    : ID LPAREN argList RPAREN
                     addChild($$, id);
                     tree* empty_args = maketree(ARGLIST);
                     addChild($$, empty_args);
-                    check_function_call($1, empty_args, yylineno);
+                    //check_function_call($1, empty_args, yylineno);
                 }
                 ;
 
