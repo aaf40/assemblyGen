@@ -467,11 +467,40 @@ static int generateIdentifier(tree* node) {
         if (entry->scope == GLOBAL_SCOPE) {
             emitInstruction("\tlw $s%d, var%s", reg, entry->id);
         } else if (entry->scope == LOCAL_SCOPE && 
-            entry->parent_function != NULL && 
-            entry->offset > 0) {
-            emitInstruction("\tlw $s%d, %d($fp)", reg, entry->offset);
-        }else {
-            emitInstruction("\tlw $s%d, 4($fp)", reg);
+                entry->parent_function != NULL) {
+            // Check if this is a parameter
+            param* params = entry->parent_function->params;
+            bool isParameter = false;
+            while (params) {
+                if (strcmp(params->name, entry->id) == 0) {
+                    isParameter = true;
+                    break;
+                }
+                params = params->next;
+            }
+            
+            // Check if we're inside a function call or relop
+            tree* current = node;
+            bool isInFunctionCall = false;
+            bool isInRelop = false;
+            while (current && current->parent) {
+                if (current->parent->nodeKind == FUNCCALLEXPR) {
+                    isInFunctionCall = true;
+                    break;
+                }
+                if (current->parent->nodeKind == RELOP) {
+                    isInRelop = true;
+                    break;
+                }
+                current = current->parent;
+            }
+            
+            // Always generate the load instruction
+            if (isParameter || isInFunctionCall || isInRelop) {
+                emitInstruction("\tlw $s%d, 4($fp)", reg);  // Use $fp for parameters, function args, and relops
+            } else {
+                emitInstruction("\tlw $s%d, 4($sp)", reg);  // Use $sp for local vars
+            }
         }
         //fprintf(stderr, "DEBUG: generateIdentifier - emitted load instruction\n");
         //fprintf(stderr, "DEBUG: generateIdentifier - returning register $s%d\n", reg);
