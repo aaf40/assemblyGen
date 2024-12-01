@@ -4,10 +4,7 @@
 #include "tree.h"
 #include <stdarg.h>
 
-// Register management constants
-#define NUM_REGISTERS 10
-#define NO_REGISTER -1
-#define ERROR_REGISTER -2
+
 
 // Label generation
 char* generateLabel(const char* prefix);
@@ -20,7 +17,6 @@ char* generateLoopLabel(void);
 
 // Register management functions
 void initRegisters(void);
-void freeRegister(int regNum);
 int getCurrentRegister(void);
 void setCurrentRegister(int regNum);
 
