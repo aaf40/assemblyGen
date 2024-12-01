@@ -632,30 +632,27 @@ static int generateFunctionCall(tree* node) {
     // Save return address
     emitInstruction("\t# Saving return address");
     emitInstruction("\tsw $ra, ($sp)");
-    
-    emitInstruction("\n\t# Evaluating and storing arguments");
-    
-    // Process arguments
+
+    // Process arguments if they exist
     tree* args = node->children[1];
-    if (args) {
-        fprintf(stderr, "DEBUG: Processing function arguments\n");
+    if (args && args->numChildren > 0) {
+        emitInstruction("\n\t# Evaluating and storing arguments");
         
         for (int i = 0; i < args->numChildren; i++) {
             emitInstruction("\t# Evaluating argument %d", i);
-            emitInstruction("\t# Variable expression");
-            
-            // Generate code to evaluate argument - let it use next available register
             int argReg = generateCode(args->children[i]);
-            fprintf(stderr, "DEBUG: Argument %d evaluated into register $s%d\n", i, argReg);
             
-            // Store argument
+            // Store argument (negative offset because we're storing below current sp)
             emitInstruction("\t# Storing argument %d", i);
-            emitInstruction("\tsw $s%d, -4($sp)", argReg);
-            emitInstruction("\tsubi $sp, $sp, 8");
-            
-            // Free the register
+            emitInstruction("\tsw $s%d, -%d($sp)", argReg, (i + 1) * 4);
             freeRegister(argReg);
         }
+        
+        // Final stack adjustment after all arguments (args + 1 for return address)
+        emitInstruction("\tsubi $sp, $sp, %d", (args->numChildren + 1) * 4);
+    } else {
+        // No arguments, just adjust for return address
+        emitInstruction("\tsubi $sp, $sp, 4");
     }
     
     // Generate function call
