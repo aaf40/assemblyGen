@@ -20,7 +20,6 @@ char* generateLoopLabel(void);
 
 // Register management functions
 void initRegisters(void);
-int nextRegister(void);
 void freeRegister(int regNum);
 int getCurrentRegister(void);
 void setCurrentRegister(int regNum);
