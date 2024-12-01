@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <unistd.h> 
 
 // Register management
 #define MAX_REGISTERS 8  // s0 through s7
@@ -97,6 +98,17 @@ void setCurrentRegister(int regNum) {
 }
 
 int generateCode(tree* node) {
+    static int call_count = 0;
+    call_count++;
+    
+    char buffer[100];
+    snprintf(buffer, sizeof(buffer), "CALL NUMBER: %d\n", call_count);
+    write(2, buffer, strlen(buffer));
+
+    if (node) {
+        fprintf(stderr, "NODE TYPE: %s | NODE KIND:(%d)\n", 
+                nodeNames[node->nodeKind], node->nodeKind);
+    }
     int result = NO_REGISTER;
     
     // Initialize registers at the start of AST traversal
@@ -110,6 +122,9 @@ int generateCode(tree* node) {
     
     switch(node->nodeKind) {
         case PROGRAM:
+            fprintf(stderr, "DEBUG: PROGRAM case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             // First pass: preprocess all declarations
             preprocess_declarations(node);
 
@@ -125,6 +140,9 @@ int generateCode(tree* node) {
             break;
             
         case FUNDECL: {
+            fprintf(stderr, "DEBUG: FUNDECL case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             const char* funcName = node->children[1]->name;
             
             // Create new scope BEFORE processing any declarations
@@ -153,6 +171,9 @@ int generateCode(tree* node) {
         }
             
         case FUNBODY: {
+            fprintf(stderr, "DEBUG: FUNBODY case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             // Process statements in function body
             for (int i = 0; i < node->numChildren; i++) {
                 if (i == 1) {  // The second child contains the statements
@@ -168,6 +189,9 @@ int generateCode(tree* node) {
         }
             
         case VAR: {
+            fprintf(stderr, "DEBUG: VAR case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             // Skip generating code for global variable access if parent is PROGRAM
             if (node->parent && node->parent->nodeKind == PROGRAM) {
                 return NO_REGISTER;
@@ -184,12 +208,18 @@ int generateCode(tree* node) {
         }
             
         case EXPRESSION:
+            fprintf(stderr, "DEBUG: EXPRESSION case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Processing EXPRESSION node\n");
             result = generateCode(node->children[0]);
             //printf("DEBUG: EXPRESSION returning register: %d\n", result);
             return result;
             
         case DECL:
+            fprintf(stderr, "DEBUG: DECL case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling DECL node\n");
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
@@ -197,6 +227,9 @@ int generateCode(tree* node) {
             break;
             
         case VARDECL:
+            fprintf(stderr, "DEBUG: VARDECL case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling VARDECL node\n");
             // Check if this is a global or local variable declaration
             if (node->children[1] && node->children[1]->name) {
@@ -218,11 +251,17 @@ int generateCode(tree* node) {
             break;
             
         case TYPESPEC:
+            fprintf(stderr, "DEBUG: TYPESPEC case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling TYPESPECIFIER node\n");
             // No code generation needed for type specifier
             break;
             
         case STATEMENTLIST:
+            fprintf(stderr, "DEBUG: STATEMENTLIST case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling STATEMENTLIST node\n");
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
@@ -231,41 +270,65 @@ int generateCode(tree* node) {
             
         case ADDOP:
         case MULOP:
+            fprintf(stderr, "DEBUG: ADDOP case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling arithmetic operation\n");
             result = generateArithmeticOp(node);
             break;
             
         case RELOP:
+            fprintf(stderr, "DEBUG: RELOP case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling relational operation\n");
             result = generateRelationalOp(node);
             break;
             
         case INTEGER:
+            fprintf(stderr, "DEBUG: INTEGER case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling integer node with value: %d\n", node->val);
             result = generateInteger(node);
             break;
             
         case IDENTIFIER:
+            fprintf(stderr, "DEBUG: IDENTIFIER case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling identifier\n");
             result = generateIdentifier(node);
             break;
             
         case ASSIGNSTMT:
+            fprintf(stderr, "DEBUG: ASSIGNSTMT case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling assignment statement\n");
             result = generateAssignment(node);
             break;
             
         case LOOPSTMT:
+            fprintf(stderr, "DEBUG: LOOPSTMT case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling while loop\n");
             result = generateWhileLoop(node);
             break;
             
         case CONDSTMT:
+            fprintf(stderr, "DEBUG: CONDSTMT case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             //printf("DEBUG: Handling if statement\n");
             result = generateIfStatement(node);
             break;
             
         case FUNCCALLEXPR: {
+            fprintf(stderr, "DEBUG: FUNCCALLEXPR case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             // Save current register state
             int savedRegisters[NUM_SAVED_REGS];
             memcpy(savedRegisters, registers, sizeof(registers));
@@ -283,6 +346,9 @@ int generateCode(tree* node) {
             //       node->nodeKind, 
             //       nodeNames[node->nodeKind]);
             // Continue processing children even for unhandled nodes
+            fprintf(stderr, "DEBUG: Default case reached. Node type: %s, name: %s\n",
+            nodeNames[node->nodeKind],
+            node->name ? node->name : "(null)");
             for (int i = 0; i < node->numChildren; i++) {
                 generateCode(node->children[i]);
             }
@@ -476,8 +542,8 @@ static int generateFunctionCall(tree* node) {
         return ERROR_REGISTER;
     
     char* funcName = node->children[0]->name;
-    fprintf(stderr, "DEBUG: === Function Call Analysis ===\n");
-    fprintf(stderr, "DEBUG: Calling function: %s\n", funcName);
+    //printf("DEBUG === Function Call Analysis ===\n");
+    //printf("DEBUG Calling function: %s\n", funcName);
     
     // Save return address
     emitInstruction("\t# Saving return address");
@@ -490,32 +556,32 @@ static int generateFunctionCall(tree* node) {
         
         // Get the argument list and first argument
         if (node->children[1]) {  // ARGLIST
-            fprintf(stderr, "DEBUG: Found ARGLIST node (kind=%d)\n", node->children[1]->nodeKind);
+            //printf("DEBUG Found ARGLIST node (kind=%d)\n", node->children[1]->nodeKind);
             
             tree* arglist = node->children[1];
             if (arglist->children[0]) {  // EXPRESSION
                 tree* expr = arglist->children[0];
-                fprintf(stderr, "DEBUG: Found argument node (kind=%d)\n", expr->nodeKind);
+                //printf("DEBUG Found argument node (kind=%d)\n", expr->nodeKind);
                 
                 if (expr->children[0]) {  // FACTOR
                     tree* factor = expr->children[0];
-                    fprintf(stderr, "DEBUG: Found factor node (kind=%d)\n", factor->nodeKind);
+                    //printf("DEBUG Found factor node (kind=%d)\n", factor->nodeKind);
                     
                     if (factor->children[0]) {  // VAR
                         tree* var = factor->children[0];
-                        fprintf(stderr, "DEBUG: Found var node (kind=%d)\n", var->nodeKind);
+                        //printf("DEBUG Found var node (kind=%d)\n", var->nodeKind);
                         
                         // Check for IDENTIFIER child of VAR
                         if (var->children[0]) {
                             tree* id = var->children[0];
-                            fprintf(stderr, "DEBUG: Found identifier node (kind=%d, name=%s)\n",
-                                    id->nodeKind, id->name ? id->name : "NULL");
+                            //printf("DEBUG Found identifier node (kind=%d, name=%s)\n",
+                                    //id->nodeKind, id->name ? id->name : "NULL");
                             
                             if (id->name) {
                                 symEntry* entry = ST_lookup(id->name);
                                 if (entry) {
-                                    fprintf(stderr, "DEBUG: Symbol entry found - scope=%d, id=%s\n",
-                                            entry->scope, entry->id);
+                                    //printf("DEBUG Symbol entry found - scope=%d, id=%s\n",
+                                            //entry->scope, entry->id);
                                     if (entry->scope == GLOBAL_SCOPE) {
                                         emitInstruction("\tlw $s1, var%s", entry->id);
                                     } else {
@@ -596,12 +662,12 @@ static bool will_be_local_variable(tree* node, const char* var_name) {
         if (current->nodeKind == FUNDECL) {
             // If we find a function declaration above this node,
             // then this variable will be local
-            fprintf(stderr, "DEBUG: Variable '%s' will be local to function\n", var_name);
+            //printf("DEBUG Variable '%s' will be local to function\n", var_name);
             return true;
         }
         current = current->parent;
     }
-    fprintf(stderr, "DEBUG: Variable '%s' will be global\n", var_name);
+    //printf("DEBUG Variable '%s' will be global\n", var_name);
     return false;
 }
 
@@ -609,7 +675,7 @@ static void generateHeader(FILE* fp) {
     fprintf(fp, "# Global variable allocations:\n");
     fprintf(fp, ".data\n");
     
-    fprintf(stderr, "DEBUG: === generateHeader called ===\n");
+    //printf("DEBUG === generateHeader called ===\n");
     
     // Create a hash table or array to track printed variables
     bool printed_vars[MAXIDS] = {false};  // Initialize all to false
@@ -633,7 +699,7 @@ static void generateHeader(FILE* fp) {
                     // Check if we've already printed this variable
                     int hash = entry->id[0] % MAXIDS;  // Simple hash function
                     if (!printed_vars[hash]) {
-                        fprintf(stderr, "DEBUG: Found truly global variable '%s'\n", entry->id);
+                        //printf("DEBUG Found truly global variable '%s'\n", entry->id);
                         fprintf(fp, "var%s:\t.word 0\n", entry->id);
                         printed_vars[hash] = true;
                         hasGlobals = true;
@@ -754,14 +820,14 @@ static int generateVarDecl(tree* node) {
         return ERROR_REGISTER;
     }
     
-    fprintf(stderr, "DEBUG: === generateVarDecl for %s ===\n", 
-            node->children[1]->name);
+    //printf("DEBUG === generateVarDecl for %s ===\n", 
+            //node->children[1]->name);
     
     // Mark this variable as local if it's in a function scope
     symEntry* entry = ST_lookup(node->children[1]->name);
     if (entry && current_scope != root) {
         // The parent_function should already be set by ST_insert
-        fprintf(stderr, "DEBUG: Variable '%s' is in function scope\n", entry->id);
+        //printf("DEBUG Variable '%s' is in function scope\n", entry->id);
     }
     
     return NO_REGISTER;
@@ -788,10 +854,10 @@ static void preprocess_declarations(tree* node) {
         char* var_name = node->children[1]->name;
         tree* parent_func = find_parent_function(node);
         
-        fprintf(stderr, "DEBUG: Processing variable '%s'\n", var_name);
+        //printf("DEBUG Processing variable '%s'\n", var_name);
         
         if (parent_func && parent_func->children[0]) {
-            fprintf(stderr, "DEBUG: Found in function '%s'\n", parent_func->children[0]->name);
+            //printf("DEBUG Found in function '%s'\n", parent_func->children[0]->name);
             symEntry* entry = ST_lookup(var_name);
             if (entry) {
                 entry->scope = LOCAL_SCOPE;
@@ -803,7 +869,7 @@ static void preprocess_declarations(tree* node) {
                 }
             }
         } else {
-            fprintf(stderr, "DEBUG: Variable '%s' is global\n", var_name);
+            //printf("DEBUG Variable '%s' is global\n", var_name);
             symEntry* entry = ST_lookup(var_name);
             if (entry) {
                 entry->scope = GLOBAL_SCOPE;

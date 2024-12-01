@@ -26,7 +26,7 @@ static int suppress_error = 0;
 
 #ifdef DEBUG
 #define DEBUG_PRINT(fmt, ...) \
-    fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__)
+    //printf("DEBUG " fmt "\n", ##__VA_ARGS__)
 #else
 #define DEBUG_PRINT(fmt, ...)
 #endif
@@ -186,7 +186,7 @@ typeSpecifier   : KWD_INT
 // Function declaration
 funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                 {
-                    fprintf(stderr, "DEBUG: Processing function declaration for %s\n", $2);
+                    //printf("DEBUG Processing function declaration for %s\n", $2);
                     
                     // Create function entry in global scope
                     symEntry* entry = ST_insert($2, $1->type, ST_FUNC);
@@ -196,7 +196,7 @@ funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                     
                     // Create new scope for parameters and body
                     new_scope();
-                    fprintf(stderr, "DEBUG: Created new scope for function %s\n", $2);
+                    //printf("DEBUG Created new scope for function %s\n", $2);
                     
                     // Now process parameters in the new scope
                     if ($4) {
@@ -209,8 +209,8 @@ funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                             symEntry* paramEntry = ST_insert(id->name, type->type, ST_SCALAR);
                             if (paramEntry) {
                                 paramEntry->scope = LOCAL_SCOPE;
-                                fprintf(stderr, "DEBUG: Parameter %s inserted with scope %d\n", 
-                                        id->name, paramEntry->scope);
+                                //printf("DEBUG Parameter %s inserted with scope %d\n", 
+                                        //id->name, paramEntry->scope);
                             }
                         }
                     }
@@ -227,11 +227,11 @@ funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                     if ($6) addChild($$, $6);
                     
                     up_scope();
-                    fprintf(stderr, "DEBUG: Returned to parent scope\n");
+                    //printf("DEBUG Returned to parent scope\n");
                 }
                 | typeSpecifier ID LPAREN RPAREN funBody
                 {
-                    fprintf(stderr, "DEBUG: Processing function declaration for %s (no params)\n", $2);
+                    //printf("DEBUG Processing function declaration for %s (no params)\n", $2);
                     
                     $$ = maketree(FUNDECL);
                     addChild($$, $1);  // Add type specifier
@@ -249,7 +249,7 @@ funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                     
                     // Create new scope for function body
                     new_scope();
-                    fprintf(stderr, "DEBUG: Created new scope for function %s\n", $2);
+                    //printf("DEBUG Created new scope for function %s\n", $2);
                     
                     // Add empty parameter list and function body
                     tree* emptyParams = maketree(FORMALDECLLIST);
@@ -258,7 +258,7 @@ funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                     
                     // Return to parent scope
                     up_scope();
-                    fprintf(stderr, "DEBUG: Returned to parent scope\n");
+                    //printf("DEBUG Returned to parent scope\n");
                 }
                 ;
 
@@ -276,7 +276,7 @@ formalDeclList  : formalDecl
 
 formalDecl      : typeSpecifier ID
                 {
-                    fprintf(stderr, "DEBUG: Creating formal parameter node for %s\n", $2);
+                    //printf("DEBUG Creating formal parameter node for %s\n", $2);
                     
                     $$ = maketree(FORMALDECL);
                     addChild($$, $1);

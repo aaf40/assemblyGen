@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
             print_sym_tab();
         
         generateCode(ast);
+
     }
     return 0;
 }

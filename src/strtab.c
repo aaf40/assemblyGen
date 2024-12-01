@@ -88,15 +88,15 @@ symEntry* ST_insert(char* id, enum dataType d_type, enum symbolType s_type) {
         target_scope = root;
     }
     
-    fprintf(stderr, "DEBUG: ST_insert - id=%s, current_scope=%p, root=%p\n", 
-            id, (void*)current_scope, (void*)root);
-    fprintf(stderr, "DEBUG: ST_insert - target_scope=%p, will_be_global=%d\n", 
-            (void*)target_scope, will_be_global);
+    //printf("DEBUG ST_insert - id=%s, current_scope=%p, root=%p\n", 
+            //id, (void*)current_scope, (void*)root);
+    //printf("DEBUG ST_insert - target_scope=%p, will_be_global=%d\n", 
+            //(void*)target_scope, will_be_global);
     
     // Check if variable already exists in CURRENT scope only
     symEntry* existing = ST_lookup_in_scope(id, target_scope);
     if (existing) {
-        fprintf(stderr, "DEBUG: Symbol '%s' already exists in current scope\n", id);
+        //printf("DEBUG Symbol '%s' already exists in current scope\n", id);
         return existing;
     }
     
@@ -115,8 +115,8 @@ symEntry* ST_insert(char* id, enum dataType d_type, enum symbolType s_type) {
         symEntry* main_entry = ST_lookup("main");  // Or current function
         if (main_entry) {
             entry->parent_function = main_entry;
-            fprintf(stderr, "DEBUG: Setting parent function for '%s' to '%s'\n", 
-                    id, main_entry->id);
+            //printf("DEBUG Setting parent function for '%s' to '%s'\n", 
+                    //id, main_entry->id);
         }
     } else {
         entry->parent_function = NULL;
