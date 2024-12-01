@@ -4,19 +4,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <string.h>  // for strcmp
+#include <string.h>
 
-// Global variables for register management
+// Register management
+#define MAX_REGISTERS 8  // s0 through s7
 #define FIRST_SAVED_REG 0    // $s0
 #define LAST_SAVED_REG 7     // $s7
 #define NUM_SAVED_REGS (LAST_SAVED_REG - FIRST_SAVED_REG + 1)
-
 #define VALUE_REG 0    // For immediate values and arithmetic results
 #define VAR_ACCESS_REG 1    // For variable loads/stores
 #define RETURN_REG VAR_ACCESS_REG  // For function return values (same as VAR_ACCESS_REG)
 
+static int labelCounter = 0; // Label counter for unique labels
 static int registers[NUM_SAVED_REGS];  // Track $s0-$s7 only
 static int currentRegister = NO_REGISTER;
+
+extern char *nodeNames[]; // defined in tree.c
+
 // Forward declarations
 static int generateArithmeticOp(tree* node);
 static int generateIdentifier(tree* node);
@@ -26,7 +30,6 @@ static int generateAssignment(tree* node);
 static int generateWhileLoop(tree* node);
 static int generateIfStatement(tree* node);
 static int generateFunctionCall(tree* node);
-static int traverseAST(tree* node);
 static void generateHeader(FILE* fp);
 char* generateLabel(const char* prefix);
 static void generateFunctionPrologue(const char* functionName, int numLocalVars);
@@ -34,18 +37,22 @@ static void generateFunctionEpilogue(const char* functionName, int numLocalVars)
 static void generateMainSetup(void);
 static void generateOutputFunction(void);
 static int countLocalVariables(tree* funBody);
-// Label counter for unique labels
-static int labelCounter = 0;
-
-extern char *nodeNames[];  // Defined in tree.c
-
-// Register management
-#define MAX_REGISTERS 8  // s0 through s7
-
 static bool will_be_local_variable(tree* node, const char* var_name);
-
-// Add this near the top with other forward declarations
 static void preprocess_declarations(tree* node);
+
+// Function to generate MIPS code for output
+int output(tree* node) {
+    // Generate code for the argument (the number to print)
+    int t1 = generateCode(node->children[1]);
+    
+    // Generate MIPS code to print the number
+    emitInstruction("\tmove $a0, $t%d", t1);  // Put number in $a0
+    emitInstruction("\tli $v0, 1");           // 1 = print integer syscall
+    emitInstruction("\tsyscall");             // Do the print
+    
+    freeRegister(t1);
+    return NO_REGISTER;
+}
 
 void initRegisters(void) {
     for (int i = 0; i < NUM_SAVED_REGS; i++) {
@@ -322,17 +329,6 @@ static int generateArithmeticOp(tree* node) {
     return reg;  // Return the register we used
 }
 
-static int getRegisterForPurpose(int purpose) {
-    switch(purpose) {
-        case VALUE_REG:
-            return 0;  // $s0
-        case VAR_ACCESS_REG:  // This will also handle RETURN_REG since they're the same
-            return 1;  // $s1
-        default:
-            return nextRegister();
-    }
-}
-
 static int generateIdentifier(tree* node) {
     if (!node || !node->name) {
         return ERROR_REGISTER;
@@ -474,20 +470,6 @@ static int generateIfStatement(tree* node) {
     return NO_REGISTER;
 }
 
-// Function to generate MIPS code for output
-int output(tree* node) {
-    // Generate code for the argument (the number to print)
-    int t1 = generateCode(node->children[1]);
-    
-    // Generate MIPS code to print the number
-    emitInstruction("\tmove $a0, $t%d", t1);  // Put number in $a0
-    emitInstruction("\tli $v0, 1");           // 1 = print integer syscall
-    emitInstruction("\tsyscall");             // Do the print
-    
-    freeRegister(t1);
-    return NO_REGISTER;
-}
-
 static int generateFunctionCall(tree* node) {
     if (!node || !node->children[0] || !node->children[0]->name) 
         return ERROR_REGISTER;
@@ -598,139 +580,6 @@ void emitInstruction(const char* format, ...) {
     vprintf(format, args);
     printf("\n");
     va_end(args);
-}
-
-int hasSeen(const char* name) {
-    // Cast away const when calling ST_lookup
-    symEntry* entry = ST_lookup((char *)name);
-    if (entry) {
-    // Return a register number if the variable has been assigned one
-    // For now, we'll return NO_REGISTER to indicate it exists but needs loading
-        return NO_REGISTER;
-    }
-    return ERROR_REGISTER;
-}
-
-int base(tree* node) {
-    if (!node || !node->name) {
-        return ERROR_REGISTER;
-    }
-    
-    symEntry* entry = ST_lookup(node->name);
-    if (!entry) {
-        return ERROR_REGISTER;
-    }
-    
-    // For global variables
-    if (entry->scope == GLOBAL_SCOPE) {
-        return 0;  // Global variables are at base of data segment
-    }
-    
-    // For local variables and parameters
-    // This is a simplified implementation
-    return entry->scope == LOCAL_SCOPE ? 1 : 0;
-}
-
-int offset(tree* node) {
-    if (!node || !node->name) {
-        return ERROR_REGISTER;
-    }
-    
-    symEntry* entry = ST_lookup(node->name);
-    if (!entry) {
-        return ERROR_REGISTER;
-    }
-    
-    // For arrays, calculate offset based on index
-    if (entry->sym_type == ST_ARRAY && node->numChildren > 0) {
-        // The index expression should be the first child
-        int indexReg = generateCode(node->children[0]);
-        if (indexReg >= 0) {
-            // Return the register containing the calculated offset
-            return indexReg;
-        }
-    }
-    
-    // For simple variables, return their position in the frame
-    // This is a simplified implementation
-    return 0;  // You'll need to implement proper stack frame offsets
-}
-
-int isCompatibleType(dataType type1, dataType type2) {
-    // Direct type equality
-    if (type1 == type2) return 1;
-    
-    // Special cases (if any)
-    // For example, if you want to allow int to char conversion:
-    if ((type1 == DT_INT && type2 == DT_CHAR) ||
-        (type1 == DT_CHAR && type2 == DT_INT)) {
-        return 1;
-    }
-    
-    return 0;
-}
-
-const char* typeToString(dataType type) {
-    switch(type) {
-        case DT_INT: return "int";
-        case DT_CHAR: return "char";
-        case DT_VOID: return "void";
-        case DT_ARRAY: return "array";
-        case DT_FUNC: return "function";
-        default: return "unknown";
-    }
-}
-
-void reportError(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    fprintf(stderr, "Error: ");
-    vfprintf(stderr, format, args);
-    fprintf(stderr, "\n");
-    va_end(args);
-}
-
-static int traverseAST(tree* node) {
-    if (!node) return NO_REGISTER;
-    
-    // Enhanced debug output with node kind names
-    const char* nodeKindStr;
-    switch(node->nodeKind) {
-        case PROGRAM: nodeKindStr = "PROGRAM"; break;
-        case DECLLIST: nodeKindStr = "DECLLIST"; break;
-        case DECL: nodeKindStr = "DECL"; break;
-        case VARDECL: nodeKindStr = "VARDECL"; break;
-        case FUNDECL: nodeKindStr = "FUNDECL"; break;
-        case FUNBODY: nodeKindStr = "FUNBODY"; break;
-        case STATEMENTLIST: nodeKindStr = "STATEMENTLIST"; break;
-        case ADDOP: nodeKindStr = "ADDOP"; break;
-        case MULOP: nodeKindStr = "MULOP"; break;
-        case IDENTIFIER: nodeKindStr = "IDENTIFIER"; break;
-        case INTEGER: nodeKindStr = "INTEGER"; break;
-        case RELOP: nodeKindStr = "RELOP"; break;
-        case ASSIGNSTMT: nodeKindStr = "ASSIGNSTMT"; break;
-        case LOOPSTMT: nodeKindStr = "LOOPSTMT"; break;
-        case CONDSTMT: nodeKindStr = "CONDSTMT"; break;
-        case FUNCCALLEXPR: nodeKindStr = "FUNCCALLEXPR"; break;
-        default: nodeKindStr = "UNKNOWN"; break;
-    }
-    
-    //printf("DEBUG: Traversing %s node (type %d)%s%s\n", 
-    //       nodeKindStr,
-    //       node->nodeKind,
-    //       node->name ? ", name: " : "",
-    //       node->name ? node->name : "");
-    
-    // Print number of children
-    //printf("DEBUG: Node has %d children\n", node->numChildren);
-    
-    // Recursively traverse all children
-    for (int i = 0; i < node->numChildren; i++) {
-        //printf("DEBUG: Processing child %d of %s node\n", i + 1, nodeKindStr);
-        traverseAST(node->children[i]);
-    }
-    
-    return NO_REGISTER;
 }
 
 static bool will_be_local_variable(tree* node, const char* var_name) {
