@@ -502,6 +502,9 @@ static int generateIdentifier(tree* node) {
                 emitInstruction("\tlw $s%d, 4($sp)", reg);  // Use $sp for local vars
             }
         }
+        else{
+            emitInstruction("\tlw $s%d, 4($sp)", reg);
+        }
         //fprintf(stderr, "DEBUG: generateIdentifier - emitted load instruction\n");
         //fprintf(stderr, "DEBUG: generateIdentifier - returning register $s%d\n", reg);
         return reg;  // Return the allocated register number
