@@ -13,6 +13,7 @@ table_node* root = NULL;
 table_node* current_scope = NULL;
 static param* working_list_head = NULL;
 static param* working_list_tail = NULL;
+tree* current_tree = NULL;
 
 // Define the global variables (not the types, which are in the header)
 SemanticError semantic_errors[MAX_ERRORS] = {0};
@@ -65,21 +66,37 @@ symEntry* ST_insert(char* id, enum dataType d_type, enum symbolType s_type) {
         return NULL;
     }
     
-    // Only use root scope for functions
+    // Only use root scope for functions and global variables
     table_node* target_scope = current_scope;
-    if (s_type == ST_FUNC) {
+    bool will_be_global = false;
+
+    // Check if we're in a function declaration context
+    tree* current = current_tree;  // You'll need to add this as a global variable
+    while (current) {
+        if (current->nodeKind == FUNDECL) {
+            // We're inside a function declaration
+            will_be_global = false;
+            target_scope = current_scope;
+            break;
+        }
+        current = current->parent;
+    }
+
+    // If we're not in a function context, and it's a function declaration, use root scope
+    if (!current && s_type == ST_FUNC) {
+        will_be_global = true;
         target_scope = root;
     }
     
-    fprintf(stderr, "DEBUG: ST_insert - id=%s, current_scope=%p, root=%p\n", 
-            id, (void*)current_scope, (void*)root);
-    fprintf(stderr, "DEBUG: ST_insert - target_scope=%p, will_be_global=%d\n", 
-            (void*)target_scope, target_scope == root);
+    //printf("DEBUG ST_insert - id=%s, current_scope=%p, root=%p\n", 
+            //id, (void*)current_scope, (void*)root);
+    //printf("DEBUG ST_insert - target_scope=%p, will_be_global=%d\n", 
+            //(void*)target_scope, will_be_global);
     
     // Check if variable already exists in CURRENT scope only
     symEntry* existing = ST_lookup_in_scope(id, target_scope);
     if (existing) {
-        fprintf(stderr, "DEBUG: Symbol '%s' already exists in current scope\n", id);
+        //printf("DEBUG Symbol '%s' already exists in current scope\n", id);
         return existing;
     }
     
@@ -98,8 +115,8 @@ symEntry* ST_insert(char* id, enum dataType d_type, enum symbolType s_type) {
         symEntry* main_entry = ST_lookup("main");  // Or current function
         if (main_entry) {
             entry->parent_function = main_entry;
-            fprintf(stderr, "DEBUG: Setting parent function for '%s' to '%s'\n", 
-                    id, main_entry->id);
+            //printf("DEBUG Setting parent function for '%s' to '%s'\n", 
+                    //id, main_entry->id);
         }
     } else {
         entry->parent_function = NULL;
@@ -145,6 +162,15 @@ int check_param_compatibility(symEntry *func, param *call_params) {
     }
     
     return (count == func->num_params);
+}
+
+int has_global_scope(tree* node) {
+    if (!node || !node->name) return 0;
+    
+    symEntry* entry = ST_lookup(node->name);
+    if (!entry) return 0;
+    
+    return (entry->scope == GLOBAL_SCOPE);
 }
 
 void new_scope(void) {

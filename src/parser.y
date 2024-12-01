@@ -26,7 +26,7 @@ static int suppress_error = 0;
 
 #ifdef DEBUG
 #define DEBUG_PRINT(fmt, ...) \
-    fprintf(stderr, "DEBUG: " fmt "\n", ##__VA_ARGS__)
+    //printf("DEBUG " fmt "\n", ##__VA_ARGS__)
 #else
 #define DEBUG_PRINT(fmt, ...)
 #endif
@@ -186,26 +186,53 @@ typeSpecifier   : KWD_INT
 // Function declaration
 funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                 {
-                    $$ = maketree(FUNDECL);
-                    addChild($$, $1);  // Add type specifier
+                    //printf("DEBUG Processing function declaration for %s\n", $2);
                     
-                    // Create and add identifier node
-                    tree* id = maketree(IDENTIFIER);
-                    setName(id, $2);
-                    addChild($$, id);
-                    
-                    // Add parameter list and function body
-                    if ($4) addChild($$, $4);  // formalDeclList
-                    if ($6) addChild($$, $6);  // funBody
-                    
-                    // Symbol table handling
+                    // Create function entry in global scope
                     symEntry* entry = ST_insert($2, $1->type, ST_FUNC);
                     if (!entry) {
                         add_semantic_error(yylineno, "Function redefinition.");
                     }
+                    
+                    // Create new scope for parameters and body
+                    new_scope();
+                    //printf("DEBUG Created new scope for function %s\n", $2);
+                    
+                    // Now process parameters in the new scope
+                    if ($4) {
+                        tree* params = $4;
+                        for (int i = 0; i < params->numChildren; i++) {
+                            tree* param = params->children[i];
+                            tree* type = param->children[0];
+                            tree* id = param->children[1];
+                            
+                            symEntry* paramEntry = ST_insert(id->name, type->type, ST_SCALAR);
+                            if (paramEntry) {
+                                paramEntry->scope = LOCAL_SCOPE;
+                                //printf("DEBUG Parameter %s inserted with scope %d\n", 
+                                        //id->name, paramEntry->scope);
+                            }
+                        }
+                    }
+                    
+                    // Build AST
+                    $$ = maketree(FUNDECL);
+                    addChild($$, $1);
+                    
+                    tree* id = maketree(IDENTIFIER);
+                    setName(id, $2);
+                    addChild($$, id);
+                    
+                    if ($4) addChild($$, $4);
+                    if ($6) addChild($$, $6);
+                    
+                    up_scope();
+                    //printf("DEBUG Returned to parent scope\n");
                 }
                 | typeSpecifier ID LPAREN RPAREN funBody
                 {
+                    //printf("DEBUG Processing function declaration for %s (no params)\n", $2);
+                    
                     $$ = maketree(FUNDECL);
                     addChild($$, $1);  // Add type specifier
                     
@@ -213,25 +240,29 @@ funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                     tree* id = maketree(IDENTIFIER);
                     setName(id, $2);
                     addChild($$, id);
+                    
+                    // Symbol table handling for function itself (in global scope)
+                    symEntry* entry = ST_insert($2, $1->type, ST_FUNC);
+                    if (!entry) {
+                        add_semantic_error(yylineno, "Function redefinition.");
+                    }
+                    
+                    // Create new scope for function body
+                    new_scope();
+                    //printf("DEBUG Created new scope for function %s\n", $2);
                     
                     // Add empty parameter list and function body
                     tree* emptyParams = maketree(FORMALDECLLIST);
                     addChild($$, emptyParams);
                     if ($5) addChild($$, $5);  // funBody
                     
-                    // Symbol table handling
-                    symEntry* entry = ST_insert($2, $1->type, ST_FUNC);
-                    if (!entry) {
-                        add_semantic_error(yylineno, "Function redefinition.");
-                    }
+                    // Return to parent scope
+                    up_scope();
+                    //printf("DEBUG Returned to parent scope\n");
                 }
                 ;
 
-formalDeclList  : /* empty */
-                {
-                    $$ = maketree(FORMALDECLLIST);
-                }
-                | formalDecl
+formalDeclList  : formalDecl
                 {
                     $$ = maketree(FORMALDECLLIST);
                     addChild($$, $1);
@@ -245,33 +276,14 @@ formalDeclList  : /* empty */
 
 formalDecl      : typeSpecifier ID
                 {
+                    //printf("DEBUG Creating formal parameter node for %s\n", $2);
+                    
                     $$ = maketree(FORMALDECL);
                     addChild($$, $1);
-                    tree *id = maketree(IDENTIFIER);
+                    
+                    tree* id = maketree(IDENTIFIER);
                     setName(id, $2);
                     addChild($$, id);
-                    
-                    // Add parameter to current (function) scope
-                    symEntry* entry = ST_insert($2, $1->type, ST_SCALAR);
-                    if (!entry) {
-                        add_semantic_error(yylineno, "Parameter already declared.");
-                    }
-                    add_param($2, $1->type, ST_SCALAR);
-                }
-                | typeSpecifier ID LSQ_BRKT RSQ_BRKT
-                {
-                    $$ = maketree(FORMALDECL);
-                    addChild($$, $1);
-                    tree *id = maketree(ARRAYDECL);
-                    setName(id, $2);
-                    addChild($$, id);
-                    
-                    // Add array parameter to current (function) scope
-                    symEntry* entry = ST_insert($2, $1->type, ST_ARRAY);
-                    if (!entry) {
-                        add_semantic_error(yylineno, "Parameter already declared.");
-                    }
-                    add_param($2, $1->type, ST_ARRAY);
                 }
                 ;
 
@@ -439,7 +451,7 @@ var             : ID LSQ_BRKT expression RSQ_BRKT
                     // Add comprehensive array access validation
                     symEntry* entry = ST_lookup($1);
                     if (entry) {
-                        check_array_access(entry, $3, yylineno);
+                        //check_array_access(entry, $3, yylineno);
                     } else {
                         add_semantic_error(yylineno, "Undeclared array variable");
                     }
@@ -587,7 +599,7 @@ funcCallExpr    : ID LPAREN argList RPAREN
                     addChild($$, $3);
                     
                     // Add comprehensive function call validation
-                    check_function_call($1, $3, yylineno);
+                    //check_function_call($1, $3, yylineno);
                 }
                 | ID LPAREN RPAREN
                 {
@@ -597,7 +609,7 @@ funcCallExpr    : ID LPAREN argList RPAREN
                     addChild($$, id);
                     tree* empty_args = maketree(ARGLIST);
                     addChild($$, empty_args);
-                    check_function_call($1, empty_args, yylineno);
+                    //check_function_call($1, empty_args, yylineno);
                 }
                 ;
 

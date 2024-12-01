@@ -9,27 +9,35 @@ def compare_files(expected_file, actual_file):
             
             test_name = expected_file.split('/')[-1]
             
-            # Compare content without empty lines
-            expected_content = [line.strip() for line in expected.splitlines() if line.strip()]
-            actual_content = [line.strip() for line in actual.splitlines() if line.strip()]
+            # Compare content without empty lines and DEBUG lines
+            expected_content = [line.strip() for line in expected.splitlines() 
+                              if line.strip() and not line.strip().startswith("DEBUG:")]
+            actual_content = [line.strip() for line in actual.splitlines() 
+                            if line.strip() and not line.strip().startswith("DEBUG:")]
             
             if expected_content == actual_content:
-                if expected == actual:
-                    print("\nOutput is exactly the same in both files:")
-                    print("----------------------------------------")
-                    print(expected)
+                if expected.splitlines(keepends=True) == actual.splitlines(keepends=True):
+                    print("\nOutput is exactly the same in both files (excluding DEBUG lines):")
+                    print("----------------------------------------------------------")
+                    print("\n".join(expected_content))
                     print(f"\033[92m{test_name} passed ✓\033[0m")  # Green
                 else:
-                    print("\nContent matches but newlines differ:")
-                    print("------------------------------------")
+                    print("\nContent matches but newlines differ (excluding DEBUG lines):")
+                    print("----------------------------------------------------")
                     print("\ncurrent output:")
                     print("---------------")
-                    print(actual)
+                    print("\n".join(actual_content))
                     print("\nexpected output:")
                     print("----------------")
-                    print(expected)
+                    print("\n".join(expected_content))
                     print(f"\033[93m{test_name} passed (with newline differences) ✓\033[0m")  # Yellow
                 return
+            
+            # Filter out DEBUG lines for display
+            expected = "\n".join(line for line in expected.splitlines() 
+                               if not line.strip().startswith("DEBUG:"))
+            actual = "\n".join(line for line in actual.splitlines() 
+                             if not line.strip().startswith("DEBUG:"))
             
             # Print the outputs first
             print("\ncurrent output:")
