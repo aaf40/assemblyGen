@@ -813,10 +813,10 @@ static int generateFunctionCall(tree* node) {
         }
         
         // Final stack adjustment after all arguments (args + 1 for return address)
-        emitInstruction("\taaddi $sp, $sp, -%d", (args->numChildren + 1) * 4);
+        emitInstruction("\taddi $sp, $sp, -%d", (args->numChildren + 1) * 4);
     } else {
         // No arguments, just adjust for return address
-        emitInstruction("\taaddi $sp, $sp, -4");
+        emitInstruction("\taddi $sp, $sp, -4");
     }
     
     // Generate function call
@@ -961,19 +961,19 @@ static void generateFunctionPrologue(const char* functionName, int numLocalVars)
     emitInstruction("\t# Setting up FP");
     emitInstruction("\tsw $fp, ($sp)");
     emitInstruction("\tmove $fp, $sp");
-    emitInstruction("\taaddi $sp, $sp, -4\n");
+    emitInstruction("\taddi $sp, $sp, -4\n");
     
     // Save registers
     emitInstruction("\t# Saving registers");
     for (int i = 0; i <= 7; i++) {
         emitInstruction("\tsw $s%d, ($sp)", i);
-        emitInstruction("\taaddi $sp, $sp, -4");
+        emitInstruction("\taddi $sp, $sp, -4");
     }
     
     // Allocate space for local variables
     if (numLocalVars > 0) {
         emitInstruction("\n\t# Allocate space for %d local variables.", numLocalVars);
-        emitInstruction("\taaddi $sp, $sp, -%d", numLocalVars * 4);
+        emitInstruction("\taddi $sp, $sp, -%d", numLocalVars * 4);
     }
     printf("\n");
 }
