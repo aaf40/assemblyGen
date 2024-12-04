@@ -824,11 +824,11 @@ static int generateFunctionCall(tree* node) {
     emitInstruction("\t# jal will correctly set $ra as well");
     
     // Adjust function name if needed
-    if (strcmp(funcName, "output") == 0) {
+    /*if (strcmp(funcName, "output") == 0) {
         funcName = "startoutput";
     } else if (strcmp(funcName, "func") == 0) {
         funcName = "startfunc";
-    }
+    }*/// commented out to remove start prefix
     emitInstruction("\tjal %s", funcName);
     
     // Clean up stack
@@ -891,14 +891,13 @@ static bool will_be_local_variable(tree* node, const char* var_name) {
 
 static void generateHeader(FILE* fp) {
     fprintf(fp, "# Global variable allocations:\n");
-    fprintf(fp, ".data\n");
-    
-    //printf("DEBUG === generateHeader called ===\n");
+    fprintf(fp, "\t.data\n");
     
     // Create a hash table or array to track printed variables
     bool printed_vars[MAXIDS] = {false};  // Initialize all to false
     bool hasGlobals = false;
     
+    // First pass: Handle global variables
     if (root) {
         for (int i = 0; i < MAXIDS; i++) {
             symEntry* entry = root->strTable[i];
@@ -915,19 +914,16 @@ static void generateHeader(FILE* fp) {
                     entry->parent_function == NULL) {
                     
                     // Check if we've already printed this variable
-                    int hash = entry->id[0] % MAXIDS;  // Simple hash function
+                    int hash = entry->id[0] % MAXIDS;
                     if (!printed_vars[hash]) {
-                        //printf("DEBUG Found truly global variable '%s'\n", entry->id);
                         fprintf(fp, "var%s:\t.word 0\n", entry->id);
                         printed_vars[hash] = true;
                         hasGlobals = true;
                     }
                 }
                 
-                // Clean up temporary node
                 free(temp_node->name);
                 free(temp_node);
-                
                 entry = entry->next;
             }
         }
@@ -937,12 +933,26 @@ static void generateHeader(FILE* fp) {
         fprintf(fp, "\n");
     }
     
-    fprintf(fp, ".text\n");
+    fprintf(fp, "\t.text\n");
+    
+    // Second pass: Only declare function labels with .globl
+    if (root) {
+        for (int i = 0; i < MAXIDS; i++) {
+            symEntry* entry = root->strTable[i];
+            while (entry) {
+                // Only process functions (ST_FUNC)
+                if (entry->sym_type == ST_FUNC) {
+                    fprintf(fp, "\t.globl %s\n", entry->id);
+                }
+                entry = entry->next;
+            }
+        }
+    }
 }
 
 static void generateMainSetup(void) {
     // Only generate the initial jump to main and exit syscall
-    emitInstruction("\tjal startmain");
+    //emitInstruction("\tjal startmain"); enable this if not using SPIM automatic header call to jal main
     emitInstruction("\tli $v0, 10");
     emitInstruction("\tsyscall");
 }
@@ -954,8 +964,7 @@ static char* getFunctionLabel(const char* functionName, const char* prefix) {
 }
 
 static void generateFunctionPrologue(const char* functionName, int numLocalVars) {
-    emitInstruction("\t# Function definition");
-    emitInstruction("start%s:", functionName);
+    emitInstruction("%s:", functionName);
     
     // Save old frame pointer
     emitInstruction("\t# Setting up FP");
@@ -1006,7 +1015,7 @@ static void generateFunctionEpilogue(const char* functionName, int numLocalVars)
 
 static void generateOutputFunction(void) {
     emitInstruction("# output function");
-    emitInstruction("startoutput:");
+    emitInstruction("output:");
     emitInstruction("\t# Put argument in the output register");
     emitInstruction("\tlw $a0, 4($sp)");
     emitInstruction("\t# print int is syscall 1");
