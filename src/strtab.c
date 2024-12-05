@@ -831,4 +831,3 @@ symEntry* ST_lookup_in_scope(char* id, table_node* scope) {
     }
     return NULL;
 }
-

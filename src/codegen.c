@@ -24,8 +24,9 @@ static int registers[NUM_SAVED_REGS];  // Track $s0-$s7 only
 static int currentRegister = NO_REGISTER;
 static int lastUsedRegister = -1;  // Track the last register used
 
-extern char *nodeNames[]; // defined in tree.c
+extern char *nodeNames[];
 extern char *ops[10];
+extern int error_count;
 
 // Forward declarations
 static int generateArithmeticOp(tree* node);
@@ -141,6 +142,11 @@ int generateCode(tree* node) {
     char buffer[100];
     snprintf(buffer, sizeof(buffer), "CALL NUMBER: %d\n", call_count);
     write(2, buffer, strlen(buffer));*/
+
+    if (error_count > 0) {
+        // Don't generate any code if there are semantic errors
+        exit(1);
+    }
 
     if (node) {
         //fprintf(stderr, "NODE TYPE: %s | NODE KIND:(%d)\n", nodeNames[node->nodeKind], node->nodeKind);

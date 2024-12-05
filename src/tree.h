@@ -8,6 +8,7 @@
 // Forward declaration
 typedef struct treenode tree;
 typedef enum dataType dataType;
+extern char *nodeNames[];
 
 // Node kinds for AST
 typedef enum {
@@ -54,6 +55,7 @@ struct treenode {
     char *name;
     dataType type;
     struct treenode *parent;
+    int lineno;
 };
 
 typedef struct treenode tree;
