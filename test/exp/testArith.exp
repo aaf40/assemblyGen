@@ -1,12 +1,12 @@
 # Global variable allocations:
-.data
+	.data
 
-.text
-	jal startmain
+	.text
+	.globl main
+	.globl output
 	li $v0, 10
 	syscall
-	# Function definition
-startmain:
+main:
 	# Setting up FP
 	sw $fp, ($sp)
 	move $fp, $sp
@@ -80,7 +80,7 @@ endmain:
 	jr $ra
 
 # output function
-startoutput:
+output:
 	# Put argument in the output register
 	lw $a0, 4($sp)
 	# print int is syscall 1
@@ -88,4 +88,3 @@ startoutput:
 	syscall
 	# jump back to caller
 	jr $ra
-

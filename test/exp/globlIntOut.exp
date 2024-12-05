@@ -1,13 +1,12 @@
 # Global variable allocations:
-.data
+	.data
 varx:	.word 0
-
-.text
-	jal startmain
+	.text
+	.globl main
+	.globl output
 	li $v0, 10
 	syscall
-	# Function definition
-startmain:
+main:
 	# Setting up FP
 	sw $fp, ($sp)
 	move $fp, $sp
@@ -32,35 +31,28 @@ startmain:
 	addi $sp, $sp, -4
 
 	# Integer expression
+
 	li $s0, 3
 	# Assignment
 	sw $s0, varx
-
 	# Saving return address
 	sw $ra, ($sp)
 
 	# Evaluating and storing arguments
-
 	# Evaluating argument 0
-	# Variable expression
 	lw $s1, varx
-
 	# Storing argument 0
 	sw $s1, -4($sp)
 	addi $sp, $sp, -8
-
 	# Jump to callee
 
 	# jal will correctly set $ra as well
-	jal startoutput
-
+	jal output
 	# Deallocating space for arguments
 	addi $sp, $sp, 4
-
 	# Resetting return address
 	addi $sp, $sp, 4
 	lw $ra, ($sp)
-
 
 	# Move return value into another reg
 	move $s2, $2
@@ -92,7 +84,7 @@ endmain:
 	jr $ra
 
 # output function
-startoutput:
+output:
 	# Put argument in the output register
 	lw $a0, 4($sp)
 	# print int is syscall 1
@@ -100,4 +92,3 @@ startoutput:
 	syscall
 	# jump back to caller
 	jr $ra
-
