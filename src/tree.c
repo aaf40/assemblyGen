@@ -247,6 +247,7 @@ enum dataType getExpressionType(tree* node) {
             symEntry* entry = ST_lookup(node->name);
             if (!entry) {
                 add_semantic_error(yylineno, "Undeclared variable");
+                
                 return DT_VOID;
             }
             return entry->data_type;

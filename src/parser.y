@@ -186,19 +186,19 @@ typeSpecifier   : KWD_INT
 // Function declaration
 funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                 {
-                    //printf("DEBUG Processing function declaration for %s\n", $2);
+                    // Check if function already exists
+                    symEntry* existing = ST_lookup($2);
+                    if (existing && existing->sym_type == ST_FUNC) {
+                        add_semantic_error(yylineno, "Function declared multiple times");
+                    }
                     
                     // Create function entry in global scope
                     symEntry* entry = ST_insert($2, $1->type, ST_FUNC);
-                    if (!entry) {
-                        add_semantic_error(yylineno, "Function redefinition.");
-                    }
                     
                     // Create new scope for parameters and body
                     new_scope();
-                    //printf("DEBUG Created new scope for function %s\n", $2);
                     
-                    // Now process parameters in the new scope
+                    // Process parameters in the new scope
                     if ($4) {
                         tree* params = $4;
                         for (int i = 0; i < params->numChildren; i++) {
@@ -209,8 +209,6 @@ funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                             symEntry* paramEntry = ST_insert(id->name, type->type, ST_SCALAR);
                             if (paramEntry) {
                                 paramEntry->scope = LOCAL_SCOPE;
-                                //printf("DEBUG Parameter %s inserted with scope %d\n", 
-                                        //id->name, paramEntry->scope);
                             }
                         }
                     }
@@ -227,38 +225,34 @@ funDecl         : typeSpecifier ID LPAREN formalDeclList RPAREN funBody
                     if ($6) addChild($$, $6);
                     
                     up_scope();
-                    //printf("DEBUG Returned to parent scope\n");
                 }
                 | typeSpecifier ID LPAREN RPAREN funBody
                 {
-                    //printf("DEBUG Processing function declaration for %s (no params)\n", $2);
+                    // Check if function already exists
+                    symEntry* existing = ST_lookup($2);
+                    if (existing && existing->sym_type == ST_FUNC) {
+                        add_semantic_error(yylineno, "Function declared multiple times");
+                    }
                     
                     $$ = maketree(FUNDECL);
-                    addChild($$, $1);  // Add type specifier
+                    addChild($$, $1);
                     
-                    // Create and add identifier node
                     tree* id = maketree(IDENTIFIER);
                     setName(id, $2);
                     addChild($$, id);
                     
-                    // Symbol table handling for function itself (in global scope)
+                    // Symbol table handling for function itself
                     symEntry* entry = ST_insert($2, $1->type, ST_FUNC);
-                    if (!entry) {
-                        add_semantic_error(yylineno, "Function redefinition.");
-                    }
                     
                     // Create new scope for function body
                     new_scope();
-                    //printf("DEBUG Created new scope for function %s\n", $2);
                     
                     // Add empty parameter list and function body
                     tree* emptyParams = maketree(FORMALDECLLIST);
                     addChild($$, emptyParams);
                     if ($5) addChild($$, $5);  // funBody
                     
-                    // Return to parent scope
                     up_scope();
-                    //printf("DEBUG Returned to parent scope\n");
                 }
                 ;
 
@@ -592,24 +586,32 @@ mulop           : OPER_MUL
 
 funcCallExpr    : ID LPAREN argList RPAREN
                 {
+                    // Check if function exists in symbol table
+                    symEntry* func = ST_lookup($1);
+                    if (!func || func->sym_type != ST_FUNC) {
+                        add_semantic_error(yylineno, "Undefined function");
+                    }
+                    
                     $$ = maketree(FUNCCALLEXPR);
                     tree *id = maketree(IDENTIFIER);
                     setName(id, $1);
                     addChild($$, id);
                     addChild($$, $3);
-                    
-                    // Add comprehensive function call validation
-                    //check_function_call($1, $3, yylineno);
                 }
                 | ID LPAREN RPAREN
                 {
+                    // Check if function exists in symbol table
+                    symEntry* func = ST_lookup($1);
+                    if (!func || func->sym_type != ST_FUNC) {
+                        add_semantic_error(yylineno, "Undefined function");
+                    }
+                    
                     $$ = maketree(FUNCCALLEXPR);
                     tree *id = maketree(IDENTIFIER);
                     setName(id, $1);
                     addChild($$, id);
                     tree* empty_args = maketree(ARGLIST);
                     addChild($$, empty_args);
-                    //check_function_call($1, empty_args, yylineno);
                 }
                 ;
 
