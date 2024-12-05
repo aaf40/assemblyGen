@@ -1,37 +1,37 @@
 # Global variable allocations:
-.data
+	.data
 
-.text
-	jal startmain
+	.text
+	.globl main
+	.globl output
 	li $v0, 10
 	syscall
-	# Function definition
-startmain:
+main:
 	# Setting up FP
 	sw $fp, ($sp)
 	move $fp, $sp
-	subi $sp, $sp, 4
+	addi $sp, $sp, -4
 
 	# Saving registers
 	sw $s0, ($sp)
-	subi $sp, $sp, 4
+	addi $sp, $sp, -4
 	sw $s1, ($sp)
-	subi $sp, $sp, 4
+	addi $sp, $sp, -4
 	sw $s2, ($sp)
-	subi $sp, $sp, 4
+	addi $sp, $sp, -4
 	sw $s3, ($sp)
-	subi $sp, $sp, 4
+	addi $sp, $sp, -4
 	sw $s4, ($sp)
-	subi $sp, $sp, 4
+	addi $sp, $sp, -4
 	sw $s5, ($sp)
-	subi $sp, $sp, 4
+	addi $sp, $sp, -4
 	sw $s6, ($sp)
-	subi $sp, $sp, 4
+	addi $sp, $sp, -4
 	sw $s7, ($sp)
-	subi $sp, $sp, 4
+	addi $sp, $sp, -4
 
 	# Allocate space for 1 local variables.
-	subi $sp, $sp, 4
+	addi $sp, $sp, -4
 
 	# Integer expression
 	li $s0, 4
@@ -80,7 +80,7 @@ endmain:
 	jr $ra
 
 # output function
-startoutput:
+output:
 	# Put argument in the output register
 	lw $a0, 4($sp)
 	# print int is syscall 1
@@ -88,4 +88,3 @@ startoutput:
 	syscall
 	# jump back to caller
 	jr $ra
-
